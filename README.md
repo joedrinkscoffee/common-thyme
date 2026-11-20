@@ -1,0 +1,48 @@
+# Common Thyme
+
+A dinner planner for one household. **Chef**, a Claude-powered agent, drafts
+the week every Sunday around ingredients that carry across nights, checks in
+on whether dinners actually got cooked, and reschedules them so nothing
+fresh goes to waste.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `apps/web` | The Next.js web app (Vercel) |
+| `supabase/migrations` | Database schema, row-level security, storage bucket |
+| `supabase/tests` | Checks that households can only see their own data |
+
+Everything belongs to a **household**. One person signs in with Google,
+creates the household, and invites their partner with a one-time link.
+
+## Running it locally
+
+Needs Node 22 and pnpm 10.
+
+```sh
+pnpm install
+cp .env.example apps/web/.env.local   # fill in values
+pnpm dev                               # http://localhost:3000
+```
+
+Checks (the same ones CI runs):
+
+```sh
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
+```
+
+## Database
+
+The schema lives in `supabase/migrations`. To apply it to the hosted project
+with the [Supabase CLI](https://supabase.com/docs/guides/cli):
+
+```sh
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+
+## Deploying
+
+On Vercel, import this repository and set **Root Directory** to `apps/web`,
+then add the variables from `.env.example`.
