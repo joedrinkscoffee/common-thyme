@@ -40,7 +40,7 @@ export function GoogleSignIn() {
           "flex min-h-[52px] items-center justify-center gap-2.5 rounded-full border-2 border-ink bg-paper font-bold shadow-pop",
           // Lifts toward you on hover and presses in on click, like a sticker.
           "transition-[translate,box-shadow,background-color] duration-150 ease-out",
-          "hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-cream hover:shadow-[6px_6px_0_var(--color-ink)]",
+          "hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-lemon hover:shadow-[6px_6px_0_var(--color-ink)]",
           "active:translate-x-0.5 active:translate-y-0.5 active:shadow-pop-sm",
           "motion-reduce:transition-none motion-reduce:hover:translate-x-0 motion-reduce:hover:translate-y-0",
           "disabled:pointer-events-none disabled:opacity-60",
