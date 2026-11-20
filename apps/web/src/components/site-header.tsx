@@ -14,19 +14,22 @@ async function SignOut() {
   );
 }
 
-export function SiteHeader() {
+const ON = "rounded-full bg-ink px-3.5 py-2 font-semibold text-cream no-underline";
+const OFF = "rounded-full px-3.5 py-2 font-semibold text-ink no-underline transition-colors hover:bg-lemon";
+
+export function SiteHeader({ active = "chef" }: { active?: "chef" | "recipes" }) {
   return (
     <header className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-      <div className="font-display text-2xl font-extrabold tracking-tight">
+      <Link href="/" className="font-display text-2xl font-extrabold tracking-tight text-ink no-underline">
         Common <span className="text-tomato">Thyme</span>
-      </div>
+      </Link>
       <nav aria-label="Main" className="flex flex-wrap items-center gap-2">
-        <Link href="/" className="rounded-full bg-ink px-3.5 py-2 font-semibold text-cream no-underline">
+        <Link href="/" className={active === "chef" ? ON : OFF} aria-current={active === "chef" ? "page" : undefined}>
           Chef
         </Link>
-        <span className="rounded-full px-3.5 py-2 text-muted" title="Coming in the recipes step">
+        <Link href="/recipes" className={active === "recipes" ? ON : OFF} aria-current={active === "recipes" ? "page" : undefined}>
           Recipes
-        </span>
+        </Link>
         <span className="rounded-full px-3.5 py-2 text-muted" title="Coming in the Chef step">
           What Chef knows
         </span>
