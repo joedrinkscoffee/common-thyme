@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { GoogleSignIn } from "@/components/google-sign-in";
 
 export const metadata: Metadata = { title: "Sign in · Common Thyme" };
@@ -43,6 +44,11 @@ export default function LoginPage() {
           <GoogleSignIn />
         </Suspense>
         <p className="text-center text-[13px] text-muted">Got an invite link? Open it, then sign in here.</p>
+        <p className="mt-2 text-center text-[13px] text-muted">
+          <Link href="/privacy" className="underline">
+            Privacy
+          </Link>
+        </p>
       </div>
     </main>
   );
