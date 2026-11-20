@@ -1,0 +1,16 @@
+{
+  "name": "common-thyme",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm --filter @common-thyme/web dev",
+    "build": "pnpm --filter @common-thyme/web build",
+    "lint": "pnpm --filter @common-thyme/web lint",
+    "typecheck": "pnpm --filter @common-thyme/web typecheck",
+    "test": "pnpm test:db && pnpm -r test",
+    "test:db": "node --test \"supabase/tests/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.15"
+  }
+}
