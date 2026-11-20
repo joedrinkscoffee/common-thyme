@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Market Day design tokens. Names are used as Tailwind classes,
+   e.g. bg-cream, text-ink, border-ink, bg-tomato, bg-lemon. */
+@theme {
+  --color-cream: #fff8ec;
+  --color-paper: #ffffff;
+  --color-ink: #1f1a17;
+  --color-ink-soft: #3d3530;
+  --color-muted: #5c524b;
+  --color-sand: #f4eadb;
+  --color-line: #f0e6d8;
+  --color-dash: #c9bcab;
+  --color-tomato: #e0442f;
+  --color-tomato-dark: #b4231a;
+
+  /* Ingredient stickers */
+  --color-lemon: #ffe066;
+  --color-caper: #c7e59a;
+  --color-kale: #a7dfc4;
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-pop-sm: 3px 3px 0 var(--color-ink);
+  --shadow-pop: 4px 4px 0 var(--color-ink);
+  --shadow-pop-lg: 5px 5px 0 var(--color-ink);
+}
+
+@layer base {
+  html {
+    background: var(--color-cream);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
+
+  a {
+    color: var(--color-tomato-dark);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-tomato);
+    outline-offset: 2px;
+  }
+}
