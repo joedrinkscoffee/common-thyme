@@ -1,27 +1,46 @@
-import Link from "next/link";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { ChefWeek } from "@/components/chef-week";
+import { CreateHousehold } from "@/components/create-household";
+import { InvitePartner } from "@/components/invite-partner";
+import { SiteHeader } from "@/components/site-header";
+import { getViewer } from "@/lib/household";
 import { sampleWeek } from "@/lib/sample-week";
+
+async function HomeContent() {
+  const viewer = await getViewer();
+
+  if (viewer.kind === "sample") {
+    return <ChefWeek initialWeek={sampleWeek} statusLabel="Sample week · not connected yet" />;
+  }
+  if (viewer.kind === "signed-out") redirect("/login");
+  if (!viewer.household) return <CreateHousehold firstName={viewer.firstName} />;
+
+  return (
+    <ChefWeek
+      initialWeek={sampleWeek}
+      firstName={viewer.firstName}
+      statusLabel={`${viewer.household.name} · sample week until your recipes are in`}
+      partnerSlot={viewer.household.memberCount < 2 ? <InvitePartner /> : null}
+    />
+  );
+}
+
+function HomeLoading() {
+  return (
+    <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 sm:px-6" aria-busy="true">
+      <p className="text-muted">Chef is getting your week…</p>
+    </main>
+  );
+}
 
 export default function Home() {
   return (
     <>
-      <header className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <div className="font-display text-2xl font-extrabold tracking-tight">
-          Common <span className="text-tomato">Thyme</span>
-        </div>
-        <nav aria-label="Main" className="flex flex-wrap gap-2">
-          <Link href="/" aria-current="page" className="rounded-full bg-ink px-3.5 py-2 font-semibold text-cream no-underline">
-            Chef
-          </Link>
-          <span className="rounded-full px-3.5 py-2 text-muted" title="Coming in the recipes step">
-            Recipes
-          </span>
-          <span className="rounded-full px-3.5 py-2 text-muted" title="Coming in the Chef step">
-            What Chef knows
-          </span>
-        </nav>
-      </header>
-      <ChefWeek initialWeek={sampleWeek} />
+      <SiteHeader />
+      <Suspense fallback={<HomeLoading />}>
+        <HomeContent />
+      </Suspense>
     </>
   );
 }
