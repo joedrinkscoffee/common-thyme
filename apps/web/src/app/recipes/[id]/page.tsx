@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { RecipePhotoButton } from "@/components/recipe-photo-button";
 import { SiteHeader } from "@/components/site-header";
 import { getViewer } from "@/lib/household";
 import { getRecipe } from "@/lib/recipes";
@@ -32,6 +33,7 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
             // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
             <img src={recipe.photoUrl} alt={`Photo of ${recipe.title}`} className="absolute inset-0 h-full w-full object-cover" />
           )}
+          {viewer.kind === "signed-in" && <RecipePhotoButton recipeId={recipe.id} hasPhoto={!!recipe.photoUrl} />}
         </div>
       </div>
       <div className="min-w-0 flex-[2_1_480px]">
