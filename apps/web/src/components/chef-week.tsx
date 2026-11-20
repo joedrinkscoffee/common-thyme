@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChefAvatar } from "./chef-avatar";
 import { RecipeTile } from "./recipe-tile";
 import { sharedPerishables, type Dinner } from "@/lib/week";
@@ -18,7 +18,18 @@ const KID_CHOICES = [
  * The Chef home: Chef's note and one question on the left, the week as square
  * tiles on the right. Uses sample data until Chef is connected.
  */
-export function ChefWeek({ initialWeek }: { initialWeek: Dinner[] }) {
+export function ChefWeek({
+  initialWeek,
+  firstName = null,
+  statusLabel,
+  partnerSlot = null,
+}: {
+  initialWeek: Dinner[];
+  firstName?: string | null;
+  statusLabel: string;
+  /** Shown under Chef's note, e.g. the partner invite. */
+  partnerSlot?: ReactNode;
+}) {
   const [week, setWeek] = useState(initialWeek);
   const [kidsAnswer, setKidsAnswer] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
@@ -40,13 +51,13 @@ export function ChefWeek({ initialWeek }: { initialWeek: Dinner[] }) {
           <ChefAvatar />
           <div>
             <div className="font-display text-[22px] font-extrabold">Chef</div>
-            <div className="text-[13px] text-muted">Sample week · not connected yet</div>
+            <div className="text-[13px] text-muted">{statusLabel}</div>
           </div>
         </div>
 
         <div className="flex flex-col gap-4 text-[17px] leading-relaxed sm:text-lg">
           <p className="m-0">
-            Morning. Last week you cooked <strong>4 of 5</strong>. The quesadillas got bumped, so I moved them to Monday
+            Morning{firstName ? `, ${firstName}` : ""}. Last week you cooked <strong>4 of 5</strong>. The quesadillas got bumped, so I moved them to Monday
             while the kale is still good.
           </p>
           <p className="m-0">
@@ -61,10 +72,7 @@ export function ChefWeek({ initialWeek }: { initialWeek: Dinner[] }) {
             ))}
             . Nothing fresh should be left by Friday.
           </p>
-          <p className="m-0 text-base text-muted">
-            Your partner hasn&apos;t joined yet. <a href="#" className="font-semibold">Send them the invite</a> and they
-            can ask me for things too.
-          </p>
+          {partnerSlot}
         </div>
 
         <div className="mt-6 rounded-[22px] border-2 border-ink bg-paper p-5 shadow-pop-lg">
