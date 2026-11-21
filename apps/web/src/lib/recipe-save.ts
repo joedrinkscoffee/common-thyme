@@ -35,7 +35,6 @@ export async function updateRecipe(recipeId: string, input: unknown, expectedUpd
       source_url: recipe.sourceUrl,
       total_minutes: recipe.totalMinutes,
       base_servings: recipe.servings,
-      kid_friendly: recipe.kidFriendly,
       tags: recipe.tags,
       notes: recipe.notes,
       steps_reconstructed: recipe.stepsReconstructed,

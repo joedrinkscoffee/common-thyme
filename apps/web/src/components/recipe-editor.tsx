@@ -13,7 +13,6 @@ export type EditableRecipe = {
   sourceUrl: string | null;
   totalMinutes: number | null;
   servings: number;
-  kidFriendly: boolean;
   tags: string[];
   notes: string | null;
   stepsReconstructed: boolean;
@@ -37,7 +36,6 @@ function toForm(r: EditableRecipe): Form {
     sourceUrl: r.sourceUrl ?? "",
     totalMinutes: r.totalMinutes ? String(r.totalMinutes) : "",
     servings: r.servings,
-    kidFriendly: r.kidFriendly,
     tags: r.tags,
     notes: r.notes ?? "",
     stepsReconstructed: r.stepsReconstructed,
@@ -336,16 +334,6 @@ export function RecipeEditor({
           </div>
           <Problem text={errors.totalMinutes} />
         </div>
-        <button
-          type="button"
-          aria-pressed={form.kidFriendly}
-          onClick={() => set("kidFriendly", !form.kidFriendly)}
-          className={`rounded-full border-2 border-ink px-3.5 py-2 text-sm font-bold transition hover:-translate-y-0.5 ${
-            form.kidFriendly ? "-rotate-1 bg-lemon shadow-pop-sm" : "bg-paper hover:bg-lemon"
-          }`}
-        >
-          {form.kidFriendly ? "✓ Kid friendly" : "Kid friendly?"}
-        </button>
       </div>
       <div className="mt-4">
         <Label htmlFor={`${id}-source`}>Source link (optional)</Label>

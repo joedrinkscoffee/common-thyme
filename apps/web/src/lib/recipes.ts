@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeUnit, parseIngredientLine, type Unit } from "@/lib/ingredient-line";
+import { KID_FRIENDLY_TAG } from "@/lib/recipe-edit";
 
 export type RecipeCard = {
   id: string;
@@ -29,7 +30,6 @@ export type RecipeLine = {
 export type RecipeDetail = RecipeCard & {
   sourceUrl: string | null;
   servings: number;
-  kidFriendly: boolean;
   notes: string | null;
   /** When it was last saved; the editor sends it back so two saves can't clash. */
   updatedAt: string | null;
@@ -110,7 +110,7 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
   const { data: r } = await supabase
     .from("recipes")
     .select(
-      "id, title, photo_path, tags, total_minutes, steps_reconstructed, source_url, base_servings, kid_friendly, notes, updated_at, archived_at, recipe_ingredients(position, raw_text, quantity, unit, name, prep, ingredient_id, ingredients(perishable)), recipe_steps(position, title, body)",
+      "id, title, photo_path, tags, total_minutes, steps_reconstructed, source_url, base_servings, notes, updated_at, archived_at, recipe_ingredients(position, raw_text, quantity, unit, name, prep, ingredient_id, ingredients(perishable)), recipe_steps(position, title, body)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -140,7 +140,6 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
     stepsReconstructed: r.steps_reconstructed,
     sourceUrl: r.source_url,
     servings: r.base_servings,
-    kidFriendly: r.kid_friendly,
     notes: r.notes,
     updatedAt: r.updated_at,
     archivedAt: r.archived_at,
@@ -156,7 +155,8 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
 export async function listTags(householdId: string): Promise<string[]> {
   const supabase = await createClient();
   const { data } = await supabase.from("recipes").select("tags").eq("household_id", householdId).is("archived_at", null);
-  return [...new Set((data ?? []).flatMap((r) => (r.tags ?? []) as string[]).map((t) => t.toLowerCase()))].sort();
+  const used = (data ?? []).flatMap((r) => (r.tags ?? []) as string[]).map((t) => t.toLowerCase());
+  return [...new Set([...used, KID_FRIENDLY_TAG])].sort();
 }
 
 /** How many dinners from today on still plan to cook this recipe. */

@@ -6,7 +6,6 @@ const base: RecipeEditInput = {
   sourceUrl: "",
   totalMinutes: "20",
   servings: 2,
-  kidFriendly: true,
   tags: ["Salad", "salad", " quick "],
   notes: "",
   stepsReconstructed: false,

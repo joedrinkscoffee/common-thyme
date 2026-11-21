@@ -4,6 +4,9 @@
  */
 import { AMOUNT_OPTIONAL, formatIngredientLine, normalizeUnit, parseAmount, type Unit } from "./ingredient-line";
 
+/** A regular tag, always offered in the editor; Chef uses it for dinners shared with the kids. */
+export const KID_FRIENDLY_TAG = "kid friendly";
+
 export const LIMITS = {
   title: 200,
   tags: 12,
@@ -26,7 +29,6 @@ export type RecipeEditInput = {
   sourceUrl: string;
   totalMinutes: string;
   servings: number;
-  kidFriendly: boolean;
   tags: string[];
   notes: string;
   /** Cleared when someone confirms rebuilt steps are right. */
@@ -49,7 +51,6 @@ export type RecipeEdit = {
   sourceUrl: string | null;
   totalMinutes: number | null;
   servings: number;
-  kidFriendly: boolean;
   tags: string[];
   notes: string | null;
   stepsReconstructed: boolean;
@@ -164,7 +165,6 @@ export function validateRecipeEdit(input: unknown): Checked {
       sourceUrl: sourceUrl ?? null,
       totalMinutes,
       servings,
-      kidFriendly: r.kidFriendly === true,
       tags,
       notes: notes || null,
       stepsReconstructed: r.stepsReconstructed === true,
