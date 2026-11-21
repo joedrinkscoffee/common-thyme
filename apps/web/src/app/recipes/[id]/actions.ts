@@ -38,3 +38,27 @@ export async function saveRecipe(recipeId: string, input: RecipeEditInput, expec
   if (result.ok) refresh();
   return result;
 }
+
+/** Deletes a recipe by hiding it. Planned dinners keep pointing at it, and restoreRecipe undoes it. */
+export async function deleteRecipe(recipeId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!supabaseEnv()) return { ok: false, error: "This is a sample recipe, so it can't be deleted." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("recipes")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", recipeId)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { ok: false, error: "Couldn't delete the recipe. Try again?" };
+  return { ok: true };
+}
+
+/** Brings back a deleted recipe. */
+export async function restoreRecipe(recipeId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!supabaseEnv()) return { ok: false, error: "This is a sample recipe." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("recipes").update({ archived_at: null }).eq("id", recipeId).select("id").maybeSingle();
+  if (error || !data) return { ok: false, error: "Couldn't bring the recipe back. Try again?" };
+  refresh();
+  return { ok: true };
+}
