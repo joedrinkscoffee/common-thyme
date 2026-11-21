@@ -62,3 +62,17 @@ export async function restoreRecipe(recipeId: string): Promise<{ ok: boolean; er
   refresh();
   return { ok: true };
 }
+
+/** Hides the "Chef rebuilt these steps" notice for everyone in the household. */
+export async function dismissRebuiltNotice(recipeId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!supabaseEnv()) return { ok: true };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("recipes")
+    .update({ steps_reconstructed: false })
+    .eq("id", recipeId)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { ok: false, error: "Couldn't hide this. Try again?" };
+  return { ok: true };
+}
