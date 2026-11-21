@@ -8,6 +8,8 @@ import { getViewer } from "@/lib/household";
 import { formatAmount } from "@/lib/ingredient-line";
 import { countUpcomingDinners, getRecipe, listIngredientNames, listTags, type RecipeDetail, type RecipeLine } from "@/lib/recipes";
 import { RecipeEditable } from "@/components/recipe-editable";
+import { RebuiltStepsNotice } from "@/components/rebuilt-steps-notice";
+import { checkSourcePage } from "@/lib/source-page";
 import { sampleRecipes } from "@/lib/sample-recipes";
 
 export const metadata: Metadata = { title: "Recipe · Common Thyme" };
@@ -54,6 +56,15 @@ function editable(r: RecipeDetail) {
     ingredients: r.ingredients.map((i) => ({ quantity: i.quantity, unit: i.unit, name: i.name, prep: i.prep, ingredientId: i.ingredientId })),
     steps: r.steps,
   };
+}
+
+/**
+ * Chef's "rebuilt these steps" sticker. It only shows while the original page
+ * really is gone: if the source link loads again, the sticker stays away.
+ */
+async function RebuiltNotice({ recipeId, sourceUrl }: { recipeId: string; sourceUrl: string | null }) {
+  if (sourceUrl && (await checkSourcePage(sourceUrl)) === "loads") return null;
+  return <RebuiltStepsNotice recipeId={recipeId} />;
 }
 
 async function Recipe({ params }: { params: Promise<{ id: string }> }) {
@@ -108,9 +119,9 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
           )}
         </p>
         {recipe.stepsReconstructed && (
-          <p className="mb-0 mt-4 inline-block -rotate-1 rounded-xl border-2 border-ink bg-lemon px-3 py-2 text-sm font-semibold">
-            The original page is gone, so Chef rebuilt these steps from what was saved.
-          </p>
+          <Suspense fallback={null}>
+            <RebuiltNotice recipeId={recipe.id} sourceUrl={recipe.sourceUrl} />
+          </Suspense>
         )}
 
         <h2 className="mb-3 mt-8 font-display text-2xl font-extrabold">Ingredients</h2>
