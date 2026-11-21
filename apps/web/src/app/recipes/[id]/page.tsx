@@ -9,6 +9,7 @@ import { formatAmount } from "@/lib/ingredient-line";
 import { countUpcomingDinners, getRecipe, listIngredientNames, listTags, type RecipeDetail, type RecipeLine } from "@/lib/recipes";
 import { RecipeEditable } from "@/components/recipe-editable";
 import { sampleRecipes } from "@/lib/sample-recipes";
+import { KID_FRIENDLY_TAG } from "@/lib/recipe-edit";
 
 export const metadata: Metadata = { title: "Recipe · Common Thyme" };
 
@@ -46,7 +47,6 @@ function editable(r: RecipeDetail) {
     sourceUrl: r.sourceUrl,
     totalMinutes: r.totalMinutes,
     servings: r.servings,
-    kidFriendly: r.kidFriendly,
     tags: r.tags,
     notes: r.notes,
     stepsReconstructed: r.stepsReconstructed,
@@ -65,7 +65,7 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
   const household = viewer.kind === "signed-in" ? viewer.household : null;
   const [knownIngredients, knownTags, upcomingDinners] = household
     ? await Promise.all([listIngredientNames(household.id), listTags(household.id), countUpcomingDinners(recipe.id)])
-    : [[], [...new Set(sampleRecipes.flatMap((r) => r.tags.map((t) => t.toLowerCase())))], 0];
+    : [[], [...new Set([...sampleRecipes.flatMap((r) => r.tags.map((t) => t.toLowerCase())), KID_FRIENDLY_TAG])].sort(), 0];
 
   return (
     <article className="flex flex-wrap items-start gap-8">
@@ -96,7 +96,6 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
         <h1 className="mb-2 mt-3 font-display text-4xl font-extrabold leading-none tracking-tight">{recipe.title}</h1>
         <p className="m-0 text-muted">
           Serves {recipe.servings}
-          {recipe.kidFriendly ? " · kid friendly" : ""}
           {recipe.totalMinutes ? ` · ${recipe.totalMinutes} min` : ""}
           {recipe.sourceUrl && (
             <>
