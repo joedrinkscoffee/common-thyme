@@ -5,7 +5,9 @@ import { notFound, redirect } from "next/navigation";
 import { RecipePhotoButton } from "@/components/recipe-photo-button";
 import { SiteHeader } from "@/components/site-header";
 import { getViewer } from "@/lib/household";
-import { getRecipe } from "@/lib/recipes";
+import { formatAmount } from "@/lib/ingredient-line";
+import { getRecipe, listIngredientNames, listTags, type RecipeDetail, type RecipeLine } from "@/lib/recipes";
+import { RecipeEditable } from "@/components/recipe-editable";
 import { sampleRecipes } from "@/lib/sample-recipes";
 
 export const metadata: Metadata = { title: "Recipe · Common Thyme" };
@@ -18,12 +20,52 @@ function hostOf(url: string): string {
   }
 }
 
+/** "1 1/2 tbsp capers" in ink, then the prep ("rinsed") lighter, the same way on every recipe. */
+function IngredientText({ line }: { line: RecipeLine }) {
+  if (!line.name) return <span>{line.raw}</span>;
+  const amount = [
+    line.quantity !== null ? formatAmount(line.quantity) : null,
+    line.unit && line.unit !== "each" && line.unit !== "to taste" ? line.unit : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const prep = [line.prep, line.unit === "to taste" ? "to taste" : null].filter(Boolean).join(", ");
+  return (
+    <span>
+      {amount && <span className="font-semibold">{amount} </span>}
+      <span>{line.name}</span>
+      {prep && <span className="text-sm italic text-muted">, {prep}</span>}
+    </span>
+  );
+}
+
+function editable(r: RecipeDetail) {
+  return {
+    id: r.id,
+    title: r.title,
+    sourceUrl: r.sourceUrl,
+    totalMinutes: r.totalMinutes,
+    servings: r.servings,
+    kidFriendly: r.kidFriendly,
+    tags: r.tags,
+    notes: r.notes,
+    stepsReconstructed: r.stepsReconstructed,
+    updatedAt: r.updatedAt,
+    ingredients: r.ingredients.map((i) => ({ quantity: i.quantity, unit: i.unit, name: i.name, prep: i.prep, ingredientId: i.ingredientId })),
+    steps: r.steps,
+  };
+}
+
 async function Recipe({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const viewer = await getViewer();
   if (viewer.kind === "signed-out") redirect(`/login?next=/recipes/${id}`);
   const recipe = viewer.kind === "sample" ? sampleRecipes.find((r) => r.id === id) : await getRecipe(id);
   if (!recipe) notFound();
+  const household = viewer.kind === "signed-in" ? viewer.household : null;
+  const [knownIngredients, knownTags] = household
+    ? await Promise.all([listIngredientNames(household.id), listTags(household.id)])
+    : [[], [...new Set(sampleRecipes.flatMap((r) => r.tags.map((t) => t.toLowerCase())))]];
 
   return (
     <article className="flex flex-wrap items-start gap-8">
@@ -37,6 +79,11 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
         </div>
       </div>
       <div className="min-w-0 flex-[2_1_480px]">
+        <RecipeEditable
+          recipe={editable(recipe)}
+          knownIngredients={[...new Set(knownIngredients.map((i) => (typeof i === "string" ? i : i.name).toLowerCase()))]}
+          knownTags={knownTags}
+        >
         <div className="flex flex-wrap gap-2">
           {recipe.tags.map((t) => (
             <span key={t} className="rounded-full bg-ink px-2.5 py-0.5 text-[12px] font-bold text-cream">
@@ -47,6 +94,7 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
         <h1 className="mb-2 mt-3 font-display text-4xl font-extrabold leading-none tracking-tight">{recipe.title}</h1>
         <p className="m-0 text-muted">
           Serves {recipe.servings}
+          {recipe.kidFriendly ? " · kid friendly" : ""}
           {recipe.totalMinutes ? ` · ${recipe.totalMinutes} min` : ""}
           {recipe.sourceUrl && (
             <>
@@ -69,7 +117,7 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
             {recipe.ingredients.map((i, n) => (
               <li key={n} className="flex items-start gap-2 leading-relaxed">
                 <span aria-hidden="true" className={`mt-2 h-2.5 w-2.5 flex-none rounded-full border-[1.5px] border-ink ${i.perishable ? "bg-kale" : "bg-paper"}`} />
-                <span>{i.raw}</span>
+                <IngredientText line={i} />
               </li>
             ))}
           </ul>
@@ -93,7 +141,8 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
         ) : (
           <p className="text-muted">No steps saved yet.</p>
         )}
-        {recipe.notes && <p className="mt-6 rounded-xl bg-sand px-4 py-3 text-sm">{recipe.notes}</p>}
+        {recipe.notes && <p className="mt-6 whitespace-pre-line rounded-xl bg-sand px-4 py-3 text-sm">{recipe.notes}</p>}
+        </RecipeEditable>
       </div>
     </article>
   );

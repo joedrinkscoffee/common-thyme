@@ -1,4 +1,13 @@
-import type { RecipeDetail } from "./recipes";
+import { parseIngredientLine } from "./ingredient-line";
+import type { RecipeDetail, RecipeLine } from "./recipes";
+
+const line = (raw: string, perishable: boolean): RecipeLine => ({
+  raw,
+  ...parseIngredientLine(raw),
+  ingredientId: null,
+  perishable,
+  tidy: true,
+});
 
 /** Shown when Supabase isn't configured, so the recipe pages can be reviewed on their own. */
 export const sampleRecipes: RecipeDetail[] = [
@@ -11,14 +20,16 @@ export const sampleRecipes: RecipeDetail[] = [
     stepsReconstructed: true,
     sourceUrl: "https://www.blueapron.com/recipes/chicken-piccata",
     servings: 2,
+    kidFriendly: false,
     notes: null,
+    updatedAt: null,
     ingredients: [
-      { raw: "2 chicken cutlets", perishable: true },
-      { raw: "1 lemon", perishable: true },
-      { raw: "1 tbsp capers, rinsed", perishable: true },
-      { raw: "2 tbsp butter", perishable: true },
-      { raw: "¼ cup flour", perishable: false },
-      { raw: "½ cup chicken stock", perishable: false },
+      line("2 chicken cutlets", true),
+      line("1 lemon", true),
+      line("1 tbsp capers, rinsed", true),
+      line("2 tbsp butter", true),
+      line("¼ cup flour", false),
+      line("½ cup chicken stock", false),
     ],
     steps: [
       { title: "Prep the chicken", body: "Pat the cutlets dry, season with salt and pepper, and dredge in the flour." },
@@ -44,7 +55,9 @@ export const sampleRecipes: RecipeDetail[] = [
     stepsReconstructed: false,
     sourceUrl: null,
     servings: 2,
+    kidFriendly: false,
     notes: null,
+    updatedAt: null,
     ingredients: [],
     steps: [],
   })),

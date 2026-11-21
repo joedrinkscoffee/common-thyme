@@ -27,8 +27,13 @@ const JOE = "00000000-0000-0000-0000-00000000000a";
 const PARTNER = "00000000-0000-0000-0000-00000000000b";
 const STRANGER = "00000000-0000-0000-0000-00000000000c";
 
+// One in-memory database at a time: close the last one before starting the next.
+let previous = null;
+
 async function setup() {
+  await previous?.close();
   const db = new PGlite();
+  previous = db;
   await db.exec(SUPABASE_STUBS);
   for (const file of readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort()) {
     await db.exec(readFileSync(join(migrationsDir, file), "utf8"));
@@ -73,4 +78,80 @@ test("new households get default settings and new users get a profile", async ()
   assert.deepEqual(settings, { dinners_per_week: 5, base_servings: 2, kids_extra_servings: 2 });
   const [profile] = await as(JOE, "select display_name from public.profiles");
   assert.equal(profile.display_name, "Joe");
+});
+
+test("save_recipe saves a whole recipe at once and refuses stale or foreign edits", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  const [recipe] = await as(
+    JOE,
+    `insert into public.recipes (household_id, title) values ('${household}', 'Carrot Salad') returning id, updated_at`,
+  );
+  const [carrot] = await as(JOE, `insert into public.ingredients (household_id, name, perishable) values ('${household}', 'carrot', true) returning id`);
+  const edit = (title, ingredients) =>
+    JSON.stringify({
+      title,
+      base_servings: 4,
+      total_minutes: 20,
+      tags: ["salad", "quick"],
+      source_url: "",
+      ingredients,
+      steps: [{ title: "Mix", body: "Toss it all together." }, { title: "", body: "Serve." }],
+    }).replace(/'/g, "''");
+  const lines = [
+    { quantity: 1, unit: "each", name: "Carrots", prep: "shredded", raw_text: "1 carrot, shredded" },
+    { quantity: 2, unit: "tbsp", name: "lemon juice", prep: null, raw_text: "2 tbsp lemon juice" },
+  ];
+
+  const [{ updated }] = await as(
+    JOE,
+    `select public.save_recipe('${recipe.id}', '${recipe.updated_at.toISOString()}', '${edit("Shredded Carrot Salad", [{ ...lines[0], ingredient_id: carrot.id }, lines[1]])}') as updated`,
+  );
+  const [saved] = await as(JOE, `select title, base_servings, tags, source_url, updated_at from public.recipes`);
+  assert.equal(saved.title, "Shredded Carrot Salad");
+  assert.equal(saved.base_servings, 4);
+  assert.deepEqual(saved.tags, ["salad", "quick"]);
+  assert.equal(saved.source_url, null);
+  assert.equal(saved.updated_at.getTime(), updated.getTime());
+
+  const rows = await as(
+    JOE,
+    `select ri.position, ri.name, ri.prep, ri.unit, ri.quantity::float as quantity, i.name as ingredient
+     from public.recipe_ingredients ri left join public.ingredients i on i.id = ri.ingredient_id order by position`,
+  );
+  assert.deepEqual(rows.map((r) => [r.name, r.prep, r.ingredient]), [
+    ["Carrots", "shredded", "carrot"],
+    ["lemon juice", null, "lemon juice"],
+  ]);
+  const steps = await as(JOE, `select position, title, body from public.recipe_steps order by position`);
+  assert.deepEqual(steps.map((s) => s.title), ["Mix", null]);
+
+  // A second save with the old timestamp is refused, and nothing changes.
+  await assert.rejects(
+    as(JOE, `select public.save_recipe('${recipe.id}', '${recipe.updated_at.toISOString()}', '${edit("Stale", [])}')`),
+    /recipe_changed/,
+  );
+  assert.equal((await as(JOE, `select title from public.recipes`))[0].title, "Shredded Carrot Salad");
+  assert.equal((await as(JOE, `select count(*)::int as n from public.recipe_ingredients`))[0].n, 2);
+
+  // Someone outside the household can't see it, so they can't save it either.
+  await assert.rejects(
+    as(STRANGER, `select public.save_recipe('${recipe.id}', null, '${edit("Mine now", [])}')`),
+    /recipe_not_found/,
+  );
+
+  // An ingredient from another household is never linked.
+  const [{ id: other }] = await as(STRANGER, `select public.create_household('Other') as id`);
+  const [theirs] = await as(STRANGER, `insert into public.ingredients (household_id, name) values ('${other}', 'secret') returning id`);
+  await as(JOE, `select public.save_recipe('${recipe.id}', null, '${edit("Salad", [{ ...lines[1], name: null, ingredient_id: theirs.id }])}')`);
+  assert.equal((await as(JOE, `select ingredient_id from public.recipe_ingredients`))[0].ingredient_id, null);
+});
+
+test("recipe source links must be web links", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  await assert.rejects(
+    as(JOE, `insert into public.recipes (household_id, title, source_url) values ('${household}', 'x', 'javascript:alert(1)')`),
+    /recipes_source_url_http/,
+  );
 });
