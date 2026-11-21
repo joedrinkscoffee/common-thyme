@@ -1,7 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { supabaseEnv } from "@/lib/supabase/env";
+import { refresh } from "next/cache";
 import { isPhotoPathFor, photoPathFor } from "@/lib/recipe-photo";
+import type { RecipeEditInput } from "@/lib/recipe-edit";
+import { updateRecipe, type SaveResult } from "@/lib/recipe-save";
 
 export type PhotoTarget = { ok: true; path: string } | { ok: false; error: string };
 
@@ -25,4 +29,12 @@ export async function savePhoto(recipeId: string, path: string): Promise<{ ok: b
     await supabase.storage.from("recipe-photos").remove([recipe.photo_path]);
   }
   return { ok: true };
+}
+
+/** Saves the recipe page's edit form. See updateRecipe for the rules. */
+export async function saveRecipe(recipeId: string, input: RecipeEditInput, expectedUpdatedAt: string | null): Promise<SaveResult> {
+  if (!supabaseEnv()) return { ok: false, error: "This is a sample recipe, so changes can't be saved." };
+  const result = await updateRecipe(recipeId, input, expectedUpdatedAt);
+  if (result.ok) refresh();
+  return result;
 }

@@ -2,7 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/household";
+import { refresh } from "next/cache";
 import { parseRecipe, photoExtension } from "@/lib/recipe-import";
+import { tidyIngredientLines } from "@/lib/recipe-save";
 
 export type ImportOneResult =
   | { ok: true; title: string; photo: "saved" | "none" | "failed" }
@@ -132,4 +134,13 @@ export async function importRecipe(input: unknown): Promise<ImportOneResult> {
   if (uploadError) return { ok: true, title: recipe.title, photo: "failed" };
   await supabase.from("recipes").update({ photo_path: path }).eq("id", saved.id);
   return { ok: true, title: recipe.title, photo: "saved" };
+}
+
+/** Splits imported ingredient lines into amount, unit, base ingredient and prep. */
+export async function tidyIngredients(): Promise<{ ok: boolean; tidied: number; error?: string }> {
+  const viewer = await getViewer();
+  if (viewer.kind !== "signed-in" || !viewer.household) return { ok: false, tidied: 0, error: "Sign in and create a household first." };
+  const result = await tidyIngredientLines(viewer.household.id);
+  if (result.ok) refresh();
+  return result;
 }
