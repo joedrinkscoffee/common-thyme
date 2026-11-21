@@ -23,6 +23,7 @@ export const sampleRecipes: RecipeDetail[] = [
     kidFriendly: false,
     notes: null,
     updatedAt: null,
+    archivedAt: null,
     ingredients: [
       line("2 chicken cutlets", true),
       line("1 lemon", true),
@@ -58,6 +59,7 @@ export const sampleRecipes: RecipeDetail[] = [
     kidFriendly: false,
     notes: null,
     updatedAt: null,
+    archivedAt: null,
     ingredients: [],
     steps: [],
   })),

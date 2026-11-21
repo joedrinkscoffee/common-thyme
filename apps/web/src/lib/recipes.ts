@@ -33,6 +33,8 @@ export type RecipeDetail = RecipeCard & {
   notes: string | null;
   /** When it was last saved; the editor sends it back so two saves can't clash. */
   updatedAt: string | null;
+  /** Set when the recipe was deleted; it's hidden from lists but can be restored. */
+  archivedAt: string | null;
   ingredients: RecipeLine[];
   steps: { title: string | null; body: string }[];
 };
@@ -87,6 +89,7 @@ export async function listRecipes(householdId: string): Promise<RecipeCard[]> {
     .from("recipes")
     .select("id, title, photo_path, tags, total_minutes, steps_reconstructed")
     .eq("household_id", householdId)
+    .is("archived_at", null)
     .order("title");
   const rows = data ?? [];
   const urls = await signPhotos(rows.map((r) => r.photo_path));
@@ -107,7 +110,7 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
   const { data: r } = await supabase
     .from("recipes")
     .select(
-      "id, title, photo_path, tags, total_minutes, steps_reconstructed, source_url, base_servings, kid_friendly, notes, updated_at, recipe_ingredients(position, raw_text, quantity, unit, name, prep, ingredient_id, ingredients(perishable)), recipe_steps(position, title, body)",
+      "id, title, photo_path, tags, total_minutes, steps_reconstructed, source_url, base_servings, kid_friendly, notes, updated_at, archived_at, recipe_ingredients(position, raw_text, quantity, unit, name, prep, ingredient_id, ingredients(perishable)), recipe_steps(position, title, body)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -140,6 +143,7 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
     kidFriendly: r.kid_friendly,
     notes: r.notes,
     updatedAt: r.updated_at,
+    archivedAt: r.archived_at,
     ingredients: lines.map((l) => {
       const ing = Array.isArray(l.ingredients) ? l.ingredients[0] : l.ingredients;
       return lineFrom({ ...l, perishable: !!ing?.perishable });
@@ -151,6 +155,27 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
 /** Every tag the household uses, for the editor's suggestions. */
 export async function listTags(householdId: string): Promise<string[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("recipes").select("tags").eq("household_id", householdId);
+  const { data } = await supabase.from("recipes").select("tags").eq("household_id", householdId).is("archived_at", null);
   return [...new Set((data ?? []).flatMap((r) => (r.tags ?? []) as string[]).map((t) => t.toLowerCase()))].sort();
+}
+
+/** How many dinners from today on still plan to cook this recipe. */
+export async function countUpcomingDinners(recipeId: string): Promise<number> {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const { count } = await supabase
+    .from("planned_dinners")
+    .select("id", { count: "exact", head: true })
+    .eq("recipe_id", recipeId)
+    .eq("status", "planned")
+    .gte("date", today);
+  return count ?? 0;
+}
+
+/** The title of a recipe deleted moments ago, for the Undo sticker. */
+export async function getDeletedTitle(id: string): Promise<string | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.from("recipes").select("title").eq("id", id).not("archived_at", "is", null).maybeSingle();
+  return data?.title ?? null;
 }

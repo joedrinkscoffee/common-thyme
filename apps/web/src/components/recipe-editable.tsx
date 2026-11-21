@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { restoreRecipe } from "@/app/recipes/[id]/actions";
 import { RecipeEditor, type EditableRecipe } from "@/components/recipe-editor";
 
 /**
@@ -11,13 +12,20 @@ export function RecipeEditable({
   recipe,
   knownIngredients,
   knownTags,
+  upcomingDinners,
+  deleted = false,
   children,
 }: {
   recipe: EditableRecipe;
   knownIngredients: string[];
   knownTags: string[];
+  upcomingDinners: number;
+  /** A deleted recipe can't be edited, only restored. */
+  deleted?: boolean;
   children: ReactNode;
 }) {
+  const [restoring, startRestore] = useTransition();
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -27,12 +35,39 @@ export function RecipeEditable({
     return () => clearTimeout(t);
   }, [saved]);
 
+  if (deleted) {
+    return (
+      <div>
+        <div role="status" className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-ink bg-sand px-4 py-3">
+          <p className="m-0 mr-auto font-semibold">This recipe was deleted. It&rsquo;s hidden from your recipes and Chef won&rsquo;t suggest it.</p>
+          <button
+            type="button"
+            disabled={restoring}
+            onClick={() =>
+              startRestore(async () => {
+                setRestoreError(null);
+                const r = await restoreRecipe(recipe.id);
+                if (!r.ok) setRestoreError(r.error ?? "Couldn't restore it.");
+              })
+            }
+            className="rounded-full border-2 border-ink bg-paper px-4 py-1.5 text-sm font-bold shadow-pop-sm transition hover:-translate-y-0.5 hover:bg-lemon disabled:cursor-wait"
+          >
+            {restoring ? "Restoring…" : "Restore recipe"}
+          </button>
+          {restoreError && <p className="m-0 w-full text-sm font-semibold text-tomato-dark">{restoreError}</p>}
+        </div>
+        {children}
+      </div>
+    );
+  }
+
   if (editing) {
     return (
       <RecipeEditor
         recipe={recipe}
         knownIngredients={knownIngredients}
         knownTags={knownTags}
+        upcomingDinners={upcomingDinners}
         onDone={(didSave) => {
           setEditing(false);
           setSaved(didSave);

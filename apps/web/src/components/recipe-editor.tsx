@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from "react";
-import { saveRecipe } from "@/app/recipes/[id]/actions";
+import { useRouter } from "next/navigation";
+import { deleteRecipe, saveRecipe } from "@/app/recipes/[id]/actions";
 import { AMOUNT_OPTIONAL, formatAmount, parseIngredientLine, UNITS, type Unit } from "@/lib/ingredient-line";
 import { LIMITS, validateRecipeEdit, type EditErrors, type RecipeEditInput } from "@/lib/recipe-edit";
 
@@ -97,11 +98,14 @@ export function RecipeEditor({
   recipe,
   knownIngredients,
   knownTags,
+  upcomingDinners = 0,
   onDone,
 }: {
   recipe: EditableRecipe;
   knownIngredients: string[];
   knownTags: string[];
+  /** Dinners from today on that still plan this recipe; the delete step mentions them. */
+  upcomingDinners?: number;
   onDone: (saved: boolean) => void;
 }) {
   const id = useId();
@@ -115,6 +119,10 @@ export function RecipeEditor({
   const [tagDraft, setTagDraft] = useState("");
   const [dragging, setDragging] = useState<{ list: "ingredients" | "steps"; index: number } | null>(null);
   const [saving, startSave] = useTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, startDelete] = useTransition();
+  const router = useRouter();
 
   const dirty = JSON.stringify(strip(form)) !== startSnapshot;
   const editedSteps = useMemo(
@@ -588,6 +596,55 @@ export function RecipeEditor({
           className={`${FIELD} w-full ${errors.notes ? BAD : ""}`}
         />
         <Problem text={errors.notes} />
+      </div>
+
+      {/* Delete */}
+      <div className="mt-10 border-t-2 border-dashed border-dash pt-6">
+        {confirmDelete ? (
+          <div role="alertdialog" aria-labelledby={`${id}-delete-q`} className="rounded-2xl border-2 border-ink bg-paper p-4 shadow-pop-sm">
+            <p id={`${id}-delete-q`} className="m-0 font-display text-lg font-extrabold">
+              Delete &ldquo;{recipe.title}&rdquo;?
+            </p>
+            <p className="mb-3 mt-1 text-sm leading-relaxed text-muted">
+              It leaves your recipes and Chef stops suggesting it. Past weeks still show it, and you can undo right after.
+              {upcomingDinners > 0 &&
+                ` It's planned for ${upcomingDinners === 1 ? "an upcoming dinner" : `${upcomingDinners} upcoming dinners`}, which stay on the plan until you change them.`}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold transition hover:-translate-y-0.5 hover:bg-lemon"
+              >
+                Keep it
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() =>
+                  startDelete(async () => {
+                    setDeleteError(null);
+                    const r = await deleteRecipe(recipe.id);
+                    if (!r.ok) return setDeleteError(r.error ?? "Couldn't delete the recipe.");
+                    router.push(`/recipes?deleted=${recipe.id}`);
+                  })
+                }
+                className="rounded-full border-2 border-ink bg-tomato px-4 py-2 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-tomato-dark disabled:cursor-wait disabled:opacity-80"
+              >
+                {deleting ? "Deleting…" : "Delete recipe"}
+              </button>
+            </div>
+            <Problem text={deleteError ?? undefined} />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="rounded-full border-2 border-tomato bg-transparent px-4 py-2 text-sm font-bold text-tomato-dark transition hover:-translate-y-0.5 hover:bg-tomato hover:text-white"
+          >
+            Delete recipe
+          </button>
+        )}
       </div>
 
       {/* Save bar */}

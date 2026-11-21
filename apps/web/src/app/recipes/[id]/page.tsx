@@ -6,7 +6,7 @@ import { RecipePhotoButton } from "@/components/recipe-photo-button";
 import { SiteHeader } from "@/components/site-header";
 import { getViewer } from "@/lib/household";
 import { formatAmount } from "@/lib/ingredient-line";
-import { getRecipe, listIngredientNames, listTags, type RecipeDetail, type RecipeLine } from "@/lib/recipes";
+import { countUpcomingDinners, getRecipe, listIngredientNames, listTags, type RecipeDetail, type RecipeLine } from "@/lib/recipes";
 import { RecipeEditable } from "@/components/recipe-editable";
 import { sampleRecipes } from "@/lib/sample-recipes";
 
@@ -63,9 +63,9 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
   const recipe = viewer.kind === "sample" ? sampleRecipes.find((r) => r.id === id) : await getRecipe(id);
   if (!recipe) notFound();
   const household = viewer.kind === "signed-in" ? viewer.household : null;
-  const [knownIngredients, knownTags] = household
-    ? await Promise.all([listIngredientNames(household.id), listTags(household.id)])
-    : [[], [...new Set(sampleRecipes.flatMap((r) => r.tags.map((t) => t.toLowerCase())))]];
+  const [knownIngredients, knownTags, upcomingDinners] = household
+    ? await Promise.all([listIngredientNames(household.id), listTags(household.id), countUpcomingDinners(recipe.id)])
+    : [[], [...new Set(sampleRecipes.flatMap((r) => r.tags.map((t) => t.toLowerCase())))], 0];
 
   return (
     <article className="flex flex-wrap items-start gap-8">
@@ -83,6 +83,8 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
           recipe={editable(recipe)}
           knownIngredients={[...new Set(knownIngredients.map((i) => (typeof i === "string" ? i : i.name).toLowerCase()))]}
           knownTags={knownTags}
+          upcomingDinners={upcomingDinners}
+          deleted={!!recipe.archivedAt}
         >
         <div className="flex flex-wrap gap-2">
           {recipe.tags.map((t) => (

@@ -155,3 +155,20 @@ test("recipe source links must be web links", async () => {
     /recipes_source_url_http/,
   );
 });
+
+test("a deleted recipe stays in past plans and can be restored", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  const [recipe] = await as(JOE, `insert into public.recipes (household_id, title) values ('${household}', 'Tacos') returning id`);
+  const [plan] = await as(JOE, `insert into public.meal_plans (household_id, week_start) values ('${household}', '2026-11-16') returning id`);
+  await as(
+    JOE,
+    `insert into public.planned_dinners (plan_id, household_id, recipe_id, date, servings) values ('${plan.id}', '${household}', '${recipe.id}', '2026-11-18', 2)`,
+  );
+  await as(JOE, `update public.recipes set archived_at = now() where id = '${recipe.id}'`);
+  assert.equal((await as(JOE, `select count(*)::int as n from public.recipes where archived_at is null`))[0].n, 0);
+  const [dinner] = await as(JOE, `select r.title from public.planned_dinners d join public.recipes r on r.id = d.recipe_id`);
+  assert.equal(dinner.title, "Tacos");
+  await as(JOE, `update public.recipes set archived_at = null where id = '${recipe.id}'`);
+  assert.equal((await as(JOE, `select count(*)::int as n from public.recipes where archived_at is null`))[0].n, 1);
+});
