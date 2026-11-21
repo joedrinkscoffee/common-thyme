@@ -3,45 +3,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/household";
 import { refresh } from "next/cache";
-import { parseRecipe, photoExtension } from "@/lib/recipe-import";
+import { parseRecipe } from "@/lib/recipe-import";
+import { downloadPhoto } from "@/lib/photo-fetch";
 import { tidyIngredientLines } from "@/lib/recipe-save";
 
 export type ImportOneResult =
   | { ok: true; title: string; photo: "saved" | "none" | "failed" }
   | { ok: false; title: string; error: string };
-
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-
-/** Only fetch photos from ordinary public web hosts. */
-function fetchablePhotoUrl(raw: string): URL | null {
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "https:") return null;
-    const host = u.hostname;
-    if (host === "localhost" || host.endsWith(".local") || host.endsWith(".internal")) return null;
-    if (/^[\d.]+$/.test(host) || host.includes(":") || host.startsWith("[")) return null;
-    return u;
-  } catch {
-    return null;
-  }
-}
-
-async function downloadPhoto(raw: string): Promise<{ bytes: ArrayBuffer; type: string; ext: string } | null> {
-  const u = fetchablePhotoUrl(raw);
-  if (!u) return null;
-  try {
-    const res = await fetch(u, { signal: AbortSignal.timeout(15_000), headers: { accept: "image/*" } });
-    if (!res.ok) return null;
-    const type = res.headers.get("content-type");
-    const ext = photoExtension(type);
-    if (!ext) return null;
-    const bytes = await res.arrayBuffer();
-    if (bytes.byteLength === 0 || bytes.byteLength > MAX_PHOTO_BYTES) return null;
-    return { bytes, type: type!.split(";")[0], ext };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Saves one recipe from the import file into the viewer's household, with its
