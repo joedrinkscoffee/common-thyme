@@ -16,6 +16,24 @@ fresh goes to waste.
 Everything belongs to a **household**. One person signs in with Google,
 creates the household, and invites their partner with a one-time link.
 
+## Chef
+
+Chef lives in `apps/web/src/lib/chef`:
+
+| File | What it does |
+| --- | --- |
+| `planner.ts` | The overlap engine: picks a week of recipes that share perishables, in code |
+| `session.ts` | Chef's tools (plan a week, move, swap, check in, lock in, add a recipe, remember) |
+| `agent.ts` | The Claude tool loop for one chat message |
+| `brief.ts` | Chef's note at the top of the home page, written in code (no API call) |
+| `recipe-page.ts` | Reads a recipe page's schema.org data when Chef is given a link |
+
+Chef runs on the Messages API with the household's own `ANTHROPIC_API_KEY`
+(adaptive thinking at low effort, prompt caching, server-side refusal
+fallback). Each chat message is one request to `POST /api/chef`. Opening the
+app costs nothing; only messages to Chef call Claude, and a household is
+capped at 80 messages a day.
+
 ## Running it locally
 
 Needs Node 22 and pnpm 10.

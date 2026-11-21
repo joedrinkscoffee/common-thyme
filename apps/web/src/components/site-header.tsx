@@ -17,7 +17,7 @@ async function SignOut() {
 const ON = "rounded-full bg-ink px-3.5 py-2 font-semibold text-cream no-underline";
 const OFF = "rounded-full px-3.5 py-2 font-semibold text-ink no-underline transition-colors hover:bg-lemon";
 
-export function SiteHeader({ active = "chef" }: { active?: "chef" | "recipes" }) {
+export function SiteHeader({ active = "chef" }: { active?: "chef" | "recipes" | "knows" }) {
   return (
     <header className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
       <Link href="/" className="font-display text-2xl font-extrabold tracking-tight text-ink no-underline">
@@ -30,9 +30,9 @@ export function SiteHeader({ active = "chef" }: { active?: "chef" | "recipes" })
         <Link href="/recipes" className={active === "recipes" ? ON : OFF} aria-current={active === "recipes" ? "page" : undefined}>
           Recipes
         </Link>
-        <span className="rounded-full px-3.5 py-2 text-muted" title="Coming in the Chef step">
+        <Link href="/what-chef-knows" className={active === "knows" ? ON : OFF} aria-current={active === "knows" ? "page" : undefined}>
           What Chef knows
-        </span>
+        </Link>
         <Suspense fallback={null}>
           <SignOut />
         </Suspense>
