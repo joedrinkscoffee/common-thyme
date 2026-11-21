@@ -67,6 +67,8 @@ async function runTool(session: ChefSession, name: string, input: Record<string,
       return session.addRecipeFromLinkTool(input);
     case "save_recipe":
       return session.saveRecipeTool(input);
+    case "set_ingredient_tier":
+      return session.setIngredientTierTool(input);
     case "ask":
       return session.askTool(input);
     default:

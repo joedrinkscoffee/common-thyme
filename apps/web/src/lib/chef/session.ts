@@ -7,6 +7,7 @@ import { addDays, dayName, daysBetween, isIsoDate, shortDate, weekDates, weekSta
 import { isKidFriendly, planWeek, type CatalogRecipe } from "./planner";
 import type { ChefNote, ChefStore, HouseholdSettings, NoteCategory, StoredDinner, StoredPlan } from "./store";
 import { fetchRecipePage } from "./fetch-page";
+import { SHARE_TIERS, TIER_LABEL, sortByTier, type ShareTier } from "./ingredient-tier";
 
 export type Attachment = { bytes: Uint8Array; contentType: string };
 export type Choice = { question: string; choices: string[] };
@@ -182,10 +183,21 @@ export class ChefSession {
     const avoid = avoidRefs.map((r) => this.recipeOf(r)?.id).filter((x): x is string => !!x);
 
     // Don't repeat what was cooked recently or is planned in the other weeks.
-    const around = await this.store.dinners(addDays(weekStart, -7 * this.settings.noRepeatWeeks), addDays(weekStart, 27));
-    const recent = around.filter((d) => weekStartOf(d.date) !== weekStart && d.status !== "skipped").map((d) => d.recipeId);
+    const noRepeatFrom = addDays(weekStart, -7 * this.settings.noRepeatWeeks);
+    const around = await this.store.dinners(addDays(weekStart, -7 * Math.max(this.settings.noRepeatWeeks, 4)), addDays(weekStart, 27));
+    const recent = around
+      .filter((d) => d.date >= noRepeatFrom && weekStartOf(d.date) !== weekStart && d.status !== "skipped")
+      .map((d) => d.recipeId);
     // Don't pick a recipe that's already elsewhere in this week.
     const stayingRecipes = staying.filter((d) => d.status !== "skipped").map((d) => d.recipeId);
+    // Stock-up items (walnuts, golden raisins) bought for the last few weeks or
+    // for dinners staying this week: reusing them finishes the bag.
+    const openedFrom = addDays(weekStart, -28);
+    const openedRecipes = [
+      ...around.filter((d) => d.date >= openedFrom && d.date < weekStart && d.status !== "skipped").map((d) => d.recipeId),
+      ...stayingRecipes,
+    ];
+    const opened = [...new Set(openedRecipes.flatMap((id) => this.catalog.find((r) => r.id === id)?.stockUp ?? []))];
 
     const seed = input.reshuffle ? Math.floor(Math.random() * 1e9) : [...weekStart].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 1e9;
     const result = planWeek({
@@ -195,6 +207,7 @@ export class ChefSession {
       keep,
       avoid: [...avoid, ...stayingRecipes],
       recent,
+      opened,
       seed,
     });
     if (!result.nights.length) return { ok: false, text: "There aren't enough recipes to plan from." };
@@ -214,8 +227,10 @@ export class ChefSession {
       text: [
         `Saved as a draft for the week of ${weekStart}:`,
         ...out,
-        `Perishables shared across nights: ${shared}.`,
-        `Perishables used only once: ${result.singles.join(", ") || "none"}.`,
+        `Use-up ingredients shared across nights: ${shared}.`,
+        `Use-up ingredients used only once: ${result.singles.join(", ") || "none"}.`,
+        `Pantry items shared (only mention if asked): ${result.pantryShared.map((s) => `${s.name} ×${s.nights}`).join(", ") || "none"}.`,
+        result.stockUpReused.length ? `Finishes stock-up items bought for recent weeks: ${result.stockUpReused.join(", ")}.` : "",
         result.shortOnKidFriendly ? "Note: not enough recipes are tagged kid friendly, so some kid nights use other recipes." : "",
       ]
         .filter(Boolean)
@@ -336,7 +351,9 @@ export class ChefSession {
       text: [
         `${facts.title} [${this.recipeRefFor(r.id)}], serves ${facts.servings}${facts.totalMinutes ? `, ${facts.totalMinutes} min` : ""}`,
         `Tags: ${facts.tags.join(", ") || "none"}${isKidFriendly(r) ? "" : " (not tagged kid friendly)"}`,
-        `Perishables: ${r.perishables.join(", ") || "none"}`,
+        `Use up: ${r.useUp.join(", ") || "none"}`,
+        `Use over a few weeks: ${(r.stockUp ?? []).join(", ") || "none"}`,
+        `Nice to share: ${(r.pantry ?? []).join(", ") || "none"}`,
         "Ingredients:",
         ...facts.ingredients.map((l) => `- ${l}`),
         `${facts.stepCount} steps.`,
@@ -436,7 +453,7 @@ export class ChefSession {
       title: saved.title,
       tags: recipe.tags,
       totalMinutes: recipe.totalMinutes,
-      perishables: recipe.perishable.map((p) => p.toLowerCase()),
+      ...sortByTier(recipe.perishable),
     };
     this.catalog.push(entry);
     const ref = this.refRecipe(saved.id);
@@ -446,6 +463,20 @@ export class ChefSession {
       ok: true,
       text: `Saved "${saved.title}" as ${ref} with ${recipe.ingredientLines.length} ingredients and ${recipe.steps.length} steps; ${saved.photo ? "photo saved" : "no photo"}. Tags: ${recipe.tags.join(", ") || "none"}.`,
     };
+  }
+
+  async setIngredientTierTool(input: Record<string, unknown>): Promise<ToolOutcome> {
+    const name = typeof input.ingredient === "string" ? input.ingredient.trim().toLowerCase().slice(0, 80) : "";
+    if (!name) return { ok: false, text: "ingredient is required." };
+    if (!SHARE_TIERS.includes(input.tier as ShareTier)) return { ok: false, text: `tier must be one of ${SHARE_TIERS.join(", ")}.` };
+    const tier = input.tier as ShareTier;
+    const n = await this.store.setIngredientTier(name, tier);
+    if (!n) return { ok: false, text: `No recipe uses "${name}". Check the spelling against recipe_details.` };
+    // Reload so planning sees the change; refs stay as they were.
+    this.catalog = await this.store.catalog();
+    for (const r of this.catalog) if (!this.recipeRefOf.has(r.id)) this.refRecipe(r.id);
+    this.log(`Treating ${name} as ${TIER_LABEL[tier]}`);
+    return { ok: true, text: `${name} is now "${TIER_LABEL[tier]}" (${n} ingredient${n === 1 ? "" : "s"} updated).` };
   }
 
   askTool(input: Record<string, unknown>): ToolOutcome {

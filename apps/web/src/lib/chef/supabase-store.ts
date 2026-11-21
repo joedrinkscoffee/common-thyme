@@ -6,6 +6,7 @@ import { photoPathFor } from "@/lib/recipe-photo";
 import { updateRecipe } from "@/lib/recipe-save";
 import type { RecipeEditInput } from "@/lib/recipe-edit";
 import type { CatalogRecipe } from "./planner";
+import { tierOf, type ShareTier } from "./ingredient-tier";
 import {
   DEFAULT_SETTINGS,
   type ChefNote,
@@ -74,19 +75,25 @@ export class SupabaseChefStore implements ChefStore {
   async catalog(): Promise<CatalogRecipe[]> {
     const { data, error } = await this.db
       .from("recipes")
-      .select("id, title, tags, total_minutes, recipe_ingredients(name, ingredients(name, perishable))")
+      .select("id, title, tags, total_minutes, recipe_ingredients(name, ingredients(name, perishable, share_tier))")
       .eq("household_id", this.householdId)
       .is("archived_at", null)
       .order("title");
     if (error) fail("read recipes", error);
-    type Line = { name: string | null; ingredients: One<{ name: string; perishable: boolean }> };
+    type Line = { name: string | null; ingredients: One<{ name: string; perishable: boolean; share_tier: string | null }> };
     return (data ?? []).map((r) => {
-      const perishables = new Set<string>();
+      const useUp = new Set<string>();
+      const pantry = new Set<string>();
+      const stockUp = new Set<string>();
       for (const line of (r.recipe_ingredients ?? []) as Line[]) {
         const ing = one(line.ingredients);
-        if (ing?.perishable) perishables.add(matchKey(ing.name));
+        if (!ing) continue;
+        const tier = tierOf(ing.name, ing.perishable, ing.share_tier);
+        if (tier === "use_up") useUp.add(matchKey(ing.name));
+        else if (tier === "pantry") pantry.add(matchKey(ing.name));
+        else if (tier === "stock_up") stockUp.add(matchKey(ing.name));
       }
-      return { id: r.id, title: r.title, tags: r.tags ?? [], totalMinutes: r.total_minutes, perishables: [...perishables].sort() };
+      return { id: r.id, title: r.title, tags: r.tags ?? [], totalMinutes: r.total_minutes, useUp: [...useUp].sort(), pantry: [...pantry].sort(), stockUp: [...stockUp].sort() };
     });
   }
 
@@ -195,6 +202,16 @@ export class SupabaseChefStore implements ChefStore {
       }
     }
     return { ok: true, id: row.id, title: recipe.title, photo };
+  }
+
+  async setIngredientTier(name: string, tier: ShareTier): Promise<number> {
+    const key = matchKey(name);
+    const { data } = await this.db.from("ingredients").select("id, name").eq("household_id", this.householdId);
+    const ids = (data ?? []).filter((i) => matchKey(i.name) === key).map((i) => i.id);
+    if (!ids.length) return 0;
+    const { error } = await this.db.from("ingredients").update({ share_tier: tier }).in("id", ids);
+    if (error) fail("set ingredient tier", error);
+    return ids.length;
   }
 
   async plans(from: string, to: string): Promise<StoredPlan[]> {

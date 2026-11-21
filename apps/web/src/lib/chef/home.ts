@@ -65,7 +65,7 @@ export async function buildHome(opts: {
           photoUrl: photos.get(d.recipeId) ?? null,
           sharedWithKids: d.sharedWithKids,
           status: d.status,
-          perishables: byId.get(d.recipeId)?.perishables ?? [],
+          useUp: byId.get(d.recipeId)?.useUp ?? [],
         }),
       ),
   });

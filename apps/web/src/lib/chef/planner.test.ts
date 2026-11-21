@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { overlapScore, planWeek, type CatalogRecipe } from "./planner";
 
-const r = (id: string, perishables: string[], tags: string[] = []): CatalogRecipe => ({ id, title: id, tags, totalMinutes: 30, perishables });
+const r = (id: string, useUp: string[], tags: string[] = []): CatalogRecipe => ({ id, title: id, tags, totalMinutes: 30, useUp });
 
 const catalog = [
-  r("piccata", ["lemon", "caper", "chicken"], ["kid friendly"]),
-  r("orzo", ["lemon", "caper", "shrimp"]),
-  r("pesto", ["lemon", "ricotta", "basil"], ["kid friendly"]),
+  r("piccata", ["parsley", "caper", "chicken"], ["kid friendly"]),
+  r("orzo", ["parsley", "caper", "shrimp"]),
+  r("pesto", ["parsley", "ricotta", "basil"], ["kid friendly"]),
   r("quesadilla", ["kale", "jack"], ["kid friendly"]),
   r("ramen", ["kale", "shiitake", "scallion"]),
   r("tacos", ["cilantro", "fish", "cabbage"]),
@@ -16,13 +16,13 @@ const catalog = [
 const week = ["2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26"];
 
 describe("planWeek", () => {
-  it("picks dinners that share perishables over ones that don't", () => {
+  it("picks dinners that share useUp over ones that don't", () => {
     const result = planWeek({ catalog, dates: week, kidNights: 0, seed: 1 });
     const ids = result.nights.map((n) => n.recipeId);
     expect(ids).toEqual(expect.arrayContaining(["piccata", "orzo", "pesto"]));
     expect(ids).not.toContain("tacos");
     expect(ids).not.toContain("curry");
-    expect(result.shared[0]).toEqual({ name: "lemon", nights: 3 });
+    expect(result.shared[0]).toEqual({ name: "parsley", nights: 3 });
   });
 
   it("fills every night with a different recipe, in date order", () => {
@@ -66,7 +66,32 @@ describe("planWeek", () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
-  it("scores shared perishables up and one-offs down", () => {
+  it("scores shared useUp up and one-offs down", () => {
     expect(overlapScore([catalog[0], catalog[1]])).toBeGreaterThan(overlapScore([catalog[0], catalog[5]]));
+  });
+
+  it("lets pantry items break ties but never beat a shared use-up", () => {
+    const a = { ...r("a", ["kale"]), pantry: ["caper"] };
+    const b = { ...r("b", ["mushroom"]), pantry: ["caper"] };
+    const c = r("c", ["kale"]);
+    const d = r("d", ["mushroom"]);
+    // Two shared capers lose to one shared kale.
+    expect(overlapScore([a, c])).toBeGreaterThan(overlapScore([a, b]));
+    // Same use-up overlap: the shared capers tip it.
+    expect(overlapScore([a, { ...c, pantry: ["caper"] }])).toBeGreaterThan(overlapScore([a, c]));
+    expect(overlapScore([c, d])).toBeLessThan(overlapScore([a, b]));
+  });
+
+  it("finishes a bag of walnuts a recent week opened", () => {
+    const pool = [
+      { ...r("salad", ["arugula"]), stockUp: ["walnut"] },
+      r("stew", ["carrot"]),
+      r("soup", ["leek"]),
+    ];
+    const fresh = planWeek({ catalog: pool, dates: ["2026-11-23"], kidNights: 0, seed: 2, opened: [] });
+    const reused = planWeek({ catalog: pool, dates: ["2026-11-23"], kidNights: 0, seed: 2, opened: ["walnut"] });
+    expect(reused.nights[0].recipeId).toBe("salad");
+    expect(reused.stockUpReused).toEqual(["walnut"]);
+    expect(fresh.stockUpReused).toEqual([]);
   });
 });
