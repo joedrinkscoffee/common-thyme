@@ -8,6 +8,7 @@
  * here so it is fast, free and testable.
  */
 import { KID_FRIENDLY_TAG } from "../recipe-edit";
+import { recipeSeasons, seasonFit } from "./season";
 
 export type CatalogRecipe = {
   id: string;
@@ -38,6 +39,10 @@ export type PlanRequest = {
   opened?: string[];
   /** Any number; a different seed gives a different but equally good week. */
   seed?: number;
+  /** The month (1-12) the week falls in; in-season dishes are favored. Leave out to ignore seasons. */
+  month?: number;
+  /** Nights (from dates) that need a quick dinner, 30 minutes or less. */
+  quick?: string[];
 };
 
 export type PlannedNight = { date: string; recipeId: string; sharedWithKids: boolean };
@@ -54,7 +59,16 @@ export type PlanResult = {
   stockUpReused: string[];
   /** True when there weren't enough kid friendly recipes for every kid night. */
   shortOnKidFriendly: boolean;
+  /** Picked dinners that are out of season (only when nothing better fit). */
+  outOfSeason: string[];
+  /** Picked dinners that are in season for the month. */
+  inSeason: string[];
+  /** True when there weren't enough 30-minute recipes for every quick night. */
+  shortOnQuick: boolean;
 };
+
+export const QUICK_MINUTES = 30;
+export const isQuick = (r: Pick<CatalogRecipe, "totalMinutes">) => r.totalMinutes !== null && r.totalMinutes <= QUICK_MINUTES;
 
 export const isKidFriendly = (r: Pick<CatalogRecipe, "tags">) => r.tags.some((t) => t.toLowerCase() === KID_FRIENDLY_TAG);
 
@@ -130,6 +144,18 @@ function order(picks: CatalogRecipe[], random: () => number): CatalogRecipe[] {
   return out;
 }
 
+/** Puts quick recipes on the quick nights, swapping with slower ones elsewhere. */
+function placeQuick(ordered: CatalogRecipe[], dates: string[], quick: Set<string>): CatalogRecipe[] {
+  if (!quick.size) return ordered;
+  const out = [...ordered];
+  out.forEach((r, i) => {
+    if (!quick.has(dates[i]) || isQuick(r)) return;
+    const j = out.findIndex((x, k) => isQuick(x) && !quick.has(dates[k]));
+    if (j >= 0) [out[i], out[j]] = [out[j], out[i]];
+  });
+  return out;
+}
+
 export function planWeek(req: PlanRequest): PlanResult {
   const n = req.dates.length;
   const byId = new Map(req.catalog.map((r) => [r.id, r]));
@@ -147,6 +173,12 @@ export function planWeek(req: PlanRequest): PlanResult {
   const need = n - kept.length;
   const kidAvailable = kept.filter(isKidFriendly).length + pool.filter(isKidFriendly).length;
   const kidTarget = Math.min(kidNights, kidAvailable);
+  const month = req.month;
+  const fit = (r: CatalogRecipe) => (month ? seasonFit(r, month) : 0);
+  const seasonScore = (rs: CatalogRecipe[]) => rs.reduce((s, r) => s + fit(r), 0);
+  const quickDates = new Set((req.quick ?? []).filter((d) => req.dates.includes(d)));
+  const quickAvailable = kept.filter(isQuick).length + pool.filter(isQuick).length;
+  const quickTarget = Math.min(quickDates.size, quickAvailable);
 
   let best: CatalogRecipe[] = kept;
   let bestScore = -Infinity;
@@ -166,7 +198,14 @@ export function planWeek(req: PlanRequest): PlanResult {
         if (mustBeKid && !isKidFriendly(r)) return;
         // The first free pick is mostly random, so restarts explore different weeks.
         const jitter = picks.length === kept.length ? random() * 6 : random() * 1.5;
-        const gain = overlapScore([...picks, r], opened) - base + jitter + (isKidFriendly(r) && kidsSoFar < kidTarget ? 1 : 0);
+        const quickSoFar = picks.filter(isQuick).length;
+        const gain =
+          overlapScore([...picks, r], opened) -
+          base +
+          fit(r) +
+          jitter +
+          (isKidFriendly(r) && kidsSoFar < kidTarget ? 1 : 0) +
+          (isQuick(r) && quickSoFar < quickTarget ? 3 : 0);
         if (gain > bestGain) {
           bestGain = gain;
           bestI = i;
@@ -176,14 +215,15 @@ export function planWeek(req: PlanRequest): PlanResult {
       picks.push(left.splice(bestI, 1)[0]);
     }
     const kidOk = picks.filter(isKidFriendly).length >= kidTarget;
-    const score = overlapScore(picks, opened) + (kidOk ? 0 : -100) + random() * 0.01;
+    const quickOk = picks.filter(isQuick).length >= quickTarget;
+    const score = overlapScore(picks, opened) + seasonScore(picks) + (kidOk ? 0 : -100) + (quickOk ? 0 : -50) + random() * 0.01;
     if (score > bestScore) {
       bestScore = score;
       best = picks;
     }
   }
 
-  const ordered = order(best, rng((req.seed ?? 1) + 31));
+  const ordered = placeQuick(order(best, rng((req.seed ?? 1) + 31)), req.dates, quickDates);
   // Kids share the kid friendly dinners first, then whatever is left.
   const kidIds = new Set<string>();
   for (const r of ordered) if (kidIds.size < kidNights && isKidFriendly(r)) kidIds.add(r.id);
@@ -197,5 +237,8 @@ export function planWeek(req: PlanRequest): PlanResult {
     pantryShared,
     stockUpReused,
     shortOnKidFriendly: kidAvailable < kidNights,
+    outOfSeason: month ? ordered.filter((r) => fit(r) < 0).map((r) => r.title) : [],
+    inSeason: month ? ordered.filter((r) => fit(r) > 0 && recipeSeasons(r).length).map((r) => r.title) : [],
+    shortOnQuick: quickAvailable < quickDates.size,
   };
 }

@@ -172,3 +172,18 @@ test("a deleted recipe stays in past plans and can be restored", async () => {
   await as(JOE, `update public.recipes set archived_at = null where id = '${recipe.id}'`);
   assert.equal((await as(JOE, `select count(*)::int as n from public.recipes where archived_at is null`))[0].n, 1);
 });
+
+test("a household's calendar link is private to its members", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  await as(JOE, `insert into public.household_calendars (household_id, ics_url) values ('${household}', 'https://calendar.google.com/calendar/ical/x/private-y/basic.ics')`);
+  assert.equal((await as(JOE, "select count(*)::int as n from public.household_calendars"))[0].n, 1);
+  assert.equal((await as(STRANGER, "select count(*)::int as n from public.household_calendars"))[0].n, 0);
+  await assert.rejects(
+    as(STRANGER, `update public.household_calendars set ics_url = 'https://evil.example/x.ics' returning 1`).then((r) => {
+      if (!r.length) throw new Error("row-level security hid it");
+    }),
+    /row-level security/,
+  );
+  await assert.rejects(as(JOE, `update public.household_calendars set ics_url = 'http://x'`), /check constraint/);
+});

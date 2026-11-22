@@ -3,15 +3,36 @@
  * Chef uses for recipes ("r12"), dinners ("d3") and notes ("n2"), and a log
  * of what Chef changed. Every tool goes through here.
  */
-import { addDays, dayName, daysBetween, isIsoDate, shortDate, weekDates, weekStartOf, weekdayIndex } from "./dates";
+import { addDays, dayName, daysBetween, isIsoDate, shortDate, weekStartOf, weekdayIndex } from "./dates";
 import { isKidFriendly, planWeek, type CatalogRecipe } from "./planner";
 import type { ChefNote, ChefStore, HouseholdSettings, NoteCategory, StoredDinner, StoredPlan } from "./store";
 import { fetchRecipePage } from "./fetch-page";
 import { SHARE_TIERS, TIER_LABEL, sortByTier, type ShareTier } from "./ingredient-tier";
+import { defaultNights, holidaysInWeek, isOpenNight, type Holiday } from "./holidays";
+import { monthOfWeek, seasonText } from "./season";
+import type { CalendarNight } from "./calendar";
 
 export type Attachment = { bytes: Uint8Array; contentType: string };
 export type Choice = { question: string; choices: string[] };
 export type ToolOutcome = { ok: boolean; text: string };
+/** What the last plan_week call drafted, for the auto-draft message. */
+export type DraftSummary = {
+  weekStart: string;
+  nights: string[];
+  kidNights: number;
+  shared: { name: string; nights: number }[];
+  holidays: Holiday[];
+  /** Calendar nights in the week: left open (away) or given a quick dinner (busy). */
+  calendar: CalendarNight[];
+};
+
+const HOLIDAY_HINT: Record<Holiday["effect"], string> = {
+  skip: "a holiday meal of its own; plan_week leaves it open",
+  leftovers: "leftovers night; plan_week leaves it open",
+  quick: "a busy evening; pass it as quick",
+  cookout: "a cookout day; grill dinners fit if they have them",
+  note: "worth a mention; ask if it changes anything",
+};
 
 const NOTE_CATEGORIES: NoteCategory[] = ["household", "tastes", "habits"];
 
@@ -22,6 +43,9 @@ export class ChefSession {
   changes: string[] = [];
   choice: Choice | null = null;
   addedRecipes: { id: string; title: string }[] = [];
+  lastDraft: DraftSummary | null = null;
+  /** Nights the household calendar changes; null when no calendar is linked. */
+  calendar: CalendarNight[] | null = null;
 
   private recipeRef = new Map<string, string>(); // ref -> id
   private recipeRefOf = new Map<string, string>(); // id -> ref
@@ -106,6 +130,7 @@ export class ChefSession {
     const label = (o: number) => ({ [-7]: "last week", 0: "this week", 7: "next week", 14: "the week after" })[o];
     const lines = [
       `Today is ${dayName(this.today)}, ${this.today}.`,
+      `Season: ${seasonText(monthOfWeek(weekStartOf(this.today)))}`,
       `Settings: ${this.settings.dinnersPerWeek} dinners a week usually; ${this.settings.baseServings} servings, +${this.settings.kidsExtraServings} when shared with the kids; avoid repeating a recipe within ${this.settings.noRepeatWeeks} weeks.`,
       `Partner has ${partnerJoined ? "joined" : "not joined yet"}.`,
       "",
@@ -113,13 +138,24 @@ export class ChefSession {
     for (const w of weeks) {
       const status = w.plan ? (w.plan.status === "approved" ? "locked in" : "draft") : "no plan";
       lines.push(`Week of ${w.weekStart} (${label(w.offset)}, ${status}):`);
+      for (const h of holidaysInWeek(w.weekStart)) lines.push(`  Holiday: ${dayName(h.date, "short")} ${h.date} ${h.name} (${HOLIDAY_HINT[h.effect]})`);
+      for (const c of this.calendarIn(w.weekStart)) {
+        const hint = c.kind === "away" ? "looks like travel; plan_week leaves it open" : "busy at dinnertime; plan_week makes it quick";
+        lines.push(`  Calendar: ${dayName(c.date, "short")} ${c.date} ${c.titles.join("; ")} (${hint})`);
+      }
       if (!w.dinners.length) lines.push("  (no dinners)");
       for (const d of w.dinners) lines.push(`  ${this.describeDinner(d)}`);
     }
+    if (this.calendar === null) lines.push("", "Calendar: not linked. They can link one on the What Chef knows page.");
     lines.push("", "What you know about this household:");
     if (!this.notes.length) lines.push("  (nothing yet)");
     for (const { ref, note } of this.noteRefs()) lines.push(`  ${ref} [${note.source === "you_said" ? "they said" : "you learned"}, ${note.category}] ${note.body}`);
     return lines.join("\n");
+  }
+
+  calendarIn(weekStart: string): CalendarNight[] {
+    const end = addDays(weekStart, 6);
+    return (this.calendar ?? []).filter((c) => c.date >= weekStart && c.date <= end);
   }
 
   private async dinnerOf(ref: unknown): Promise<StoredDinner | null> {
@@ -166,7 +202,10 @@ export class ChefSession {
       if (bad !== undefined) return { ok: false, text: `Every night must be a date in the week of ${weekStart}.` };
       nights = [...new Set(input.nights as string[])].sort();
     } else {
-      nights = weekDates(weekStart).slice(0, this.settings.dinnersPerWeek);
+      // The usual nights, leaving holiday meals and leftover nights open.
+      // Also travel nights from the calendar.
+      const away = new Set(this.calendarIn(weekStart).filter((c) => c.kind === "away").map((c) => c.date));
+      nights = defaultNights(weekStart, this.settings.dinnersPerWeek).filter((d) => !away.has(d));
     }
     nights = nights.filter((d) => d >= this.today && !taken.has(d));
     if (!nights.length) return { ok: false, text: "No open nights left in that week." };
@@ -199,6 +238,11 @@ export class ChefSession {
     ];
     const opened = [...new Set(openedRecipes.flatMap((id) => this.catalog.find((r) => r.id === id)?.stockUp ?? []))];
 
+    const busy = this.calendarIn(weekStart).filter((c) => c.kind === "busy").map((c) => c.date);
+    const asked = Array.isArray(input.quick) ? (input.quick as unknown[]).filter((d): d is string => isIsoDate(d)) : [];
+    const quick = [...new Set([...asked, ...busy])].sort();
+    const seasonal = input.seasonal !== false;
+
     const seed = input.reshuffle ? Math.floor(Math.random() * 1e9) : [...weekStart].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 1e9;
     const result = planWeek({
       catalog: this.catalog,
@@ -209,6 +253,8 @@ export class ChefSession {
       recent,
       opened,
       seed,
+      month: seasonal ? monthOfWeek(weekStart) : undefined,
+      quick,
     });
     if (!result.nights.length) return { ok: false, text: "There aren't enough recipes to plan from." };
 
@@ -221,6 +267,12 @@ export class ChefSession {
       out.push(this.describeDinner(d));
     }
     this.log(`Drafted the week of ${shortDate(weekStart)}`);
+    const holidays = holidaysInWeek(weekStart);
+    const planned = result.nights.map((n) => n.date);
+    const usual = defaultNights(weekStart, this.settings.dinnersPerWeek);
+    const calendar = this.calendarIn(weekStart).filter((c) => (c.kind === "busy" ? planned.includes(c.date) : usual.includes(c.date) && !planned.includes(c.date)));
+    this.lastDraft = { weekStart, nights: planned, kidNights, shared: result.shared, holidays, calendar };
+    const openHolidays = holidays.filter(isOpenNight).map((h) => `${dayName(h.date)} (${h.name})`);
     const shared = result.shared.map((s) => `${s.name} ×${s.nights}`).join(", ") || "none";
     return {
       ok: true,
@@ -232,6 +284,10 @@ export class ChefSession {
         `Pantry items shared (only mention if asked): ${result.pantryShared.map((s) => `${s.name} ×${s.nights}`).join(", ") || "none"}.`,
         result.stockUpReused.length ? `Finishes stock-up items bought for recent weeks: ${result.stockUpReused.join(", ")}.` : "",
         result.shortOnKidFriendly ? "Note: not enough recipes are tagged kid friendly, so some kid nights use other recipes." : "",
+        openHolidays.length ? `Left open for the holiday: ${openHolidays.join(", ")}. Mention it.` : "",
+        result.inSeason.length ? `In season: ${result.inSeason.join(", ")}.` : "",
+        result.outOfSeason.length ? `Out of season (nothing better fit): ${result.outOfSeason.join(", ")}.` : "",
+        quick.length ? (result.shortOnQuick ? "Note: not enough recipes take 30 minutes or less for every quick night." : `Quick nights (30 min or less): ${quick.join(", ")}.`) : "",
       ]
         .filter(Boolean)
         .join("\n"),

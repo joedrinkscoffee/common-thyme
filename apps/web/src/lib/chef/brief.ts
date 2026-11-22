@@ -5,6 +5,7 @@
  */
 import { addDays, dayName, relativeDay, weekDates, weekRangeLabel, weekStartOf, weekdayIndex } from "./dates";
 import type { DinnerStatus, PlanStatus } from "./store";
+import { holidayWeekName } from "./holidays";
 
 export type HomeDinner = {
   id: string;
@@ -129,8 +130,9 @@ export function buildBrief(opts: {
       paragraphs.push([`Next week is locked in: ${next.length} dinners.`]);
     } else {
       const shared = sharedLeft(next);
+      const holiday = holidayWeekName(nextWeek.weekStart);
       paragraphs.push([
-        `Next week's draft has ${next.length} dinners`,
+        holiday ? `Next week is ${holiday}, so the draft has just ${next.length} dinners` : `Next week's draft has ${next.length} dinners`,
         ...(shared.length ? [" built around ", ...stickerList(shared)] : []),
         ". Tell me what to change, or say the word and I'll lock it in.",
       ]);

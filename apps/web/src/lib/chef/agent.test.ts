@@ -61,7 +61,7 @@ describe("runChef", () => {
     const prompt = JSON.stringify(first.messages);
     expect(prompt).toContain("<household_state>");
     expect(prompt).toContain("Joe: Plan next week, 2 nights");
-    expect(JSON.stringify(first.system)).toContain("r1 | Chicken Piccata | 35 min | kid friendly | parsley, caper");
+    expect(JSON.stringify(first.system)).toContain("r1 | Chicken Piccata | 35 min | kid friendly |  | parsley, caper");
 
     // The second call replays the first answer and the tool result, unchanged.
     expect(calls[1].messages.slice(0, calls[0].messages.length)).toEqual(calls[0].messages);
