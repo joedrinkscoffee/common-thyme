@@ -3,7 +3,7 @@ import { getViewer } from "@/lib/household";
 import { PHOTO_TYPES } from "@/lib/recipe-photo";
 import { runChef, type HistoryItem } from "@/lib/chef/agent";
 import { ChefSession, type Attachment } from "@/lib/chef/session";
-import { chefConnected, chefContext, loadMessages, saveMessage } from "@/lib/chef/server";
+import { chefConnected, chefContext, loadCalendarNights, loadMessages, saveMessage } from "@/lib/chef/server";
 import type { ChefTurnResponse } from "@/lib/chef/home";
 
 // A Chef turn with several tool steps can take a while.
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   if (!text && !attachment) return json({ ok: false, error: "Say something first." }, 400);
 
   const household = viewer.household;
-  const { db, store, today } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household });
+  const { db, store, today, settings } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household });
 
   const { count } = await db
     .from("chef_messages")
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   const session = new ChefSession(store, today, attachment);
   const client = new Anthropic();
   try {
-    await session.load();
+    [session.calendar] = await Promise.all([loadCalendarNights(db, household.id, settings.timezone, today), session.load()]);
     const reply = await runChef({
       call: (params) => client.beta.messages.create(params),
       session,

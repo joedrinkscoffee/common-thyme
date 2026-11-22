@@ -10,6 +10,7 @@ import { fetchRecipePage } from "./fetch-page";
 import { SHARE_TIERS, TIER_LABEL, sortByTier, type ShareTier } from "./ingredient-tier";
 import { defaultNights, holidaysInWeek, isOpenNight, type Holiday } from "./holidays";
 import { monthOfWeek, seasonText } from "./season";
+import type { CalendarNight } from "./calendar";
 
 export type Attachment = { bytes: Uint8Array; contentType: string };
 export type Choice = { question: string; choices: string[] };
@@ -21,6 +22,8 @@ export type DraftSummary = {
   kidNights: number;
   shared: { name: string; nights: number }[];
   holidays: Holiday[];
+  /** Calendar nights in the week: left open (away) or given a quick dinner (busy). */
+  calendar: CalendarNight[];
 };
 
 const HOLIDAY_HINT: Record<Holiday["effect"], string> = {
@@ -41,6 +44,8 @@ export class ChefSession {
   choice: Choice | null = null;
   addedRecipes: { id: string; title: string }[] = [];
   lastDraft: DraftSummary | null = null;
+  /** Nights the household calendar changes; null when no calendar is linked. */
+  calendar: CalendarNight[] | null = null;
 
   private recipeRef = new Map<string, string>(); // ref -> id
   private recipeRefOf = new Map<string, string>(); // id -> ref
@@ -134,13 +139,23 @@ export class ChefSession {
       const status = w.plan ? (w.plan.status === "approved" ? "locked in" : "draft") : "no plan";
       lines.push(`Week of ${w.weekStart} (${label(w.offset)}, ${status}):`);
       for (const h of holidaysInWeek(w.weekStart)) lines.push(`  Holiday: ${dayName(h.date, "short")} ${h.date} ${h.name} (${HOLIDAY_HINT[h.effect]})`);
+      for (const c of this.calendarIn(w.weekStart)) {
+        const hint = c.kind === "away" ? "looks like travel; plan_week leaves it open" : "busy at dinnertime; plan_week makes it quick";
+        lines.push(`  Calendar: ${dayName(c.date, "short")} ${c.date} ${c.titles.join("; ")} (${hint})`);
+      }
       if (!w.dinners.length) lines.push("  (no dinners)");
       for (const d of w.dinners) lines.push(`  ${this.describeDinner(d)}`);
     }
+    if (this.calendar === null) lines.push("", "Calendar: not linked. They can link one on the What Chef knows page.");
     lines.push("", "What you know about this household:");
     if (!this.notes.length) lines.push("  (nothing yet)");
     for (const { ref, note } of this.noteRefs()) lines.push(`  ${ref} [${note.source === "you_said" ? "they said" : "you learned"}, ${note.category}] ${note.body}`);
     return lines.join("\n");
+  }
+
+  calendarIn(weekStart: string): CalendarNight[] {
+    const end = addDays(weekStart, 6);
+    return (this.calendar ?? []).filter((c) => c.date >= weekStart && c.date <= end);
   }
 
   private async dinnerOf(ref: unknown): Promise<StoredDinner | null> {
@@ -188,7 +203,9 @@ export class ChefSession {
       nights = [...new Set(input.nights as string[])].sort();
     } else {
       // The usual nights, leaving holiday meals and leftover nights open.
-      nights = defaultNights(weekStart, this.settings.dinnersPerWeek);
+      // Also travel nights from the calendar.
+      const away = new Set(this.calendarIn(weekStart).filter((c) => c.kind === "away").map((c) => c.date));
+      nights = defaultNights(weekStart, this.settings.dinnersPerWeek).filter((d) => !away.has(d));
     }
     nights = nights.filter((d) => d >= this.today && !taken.has(d));
     if (!nights.length) return { ok: false, text: "No open nights left in that week." };
@@ -221,7 +238,9 @@ export class ChefSession {
     ];
     const opened = [...new Set(openedRecipes.flatMap((id) => this.catalog.find((r) => r.id === id)?.stockUp ?? []))];
 
-    const quick = Array.isArray(input.quick) ? (input.quick as unknown[]).filter((d): d is string => isIsoDate(d)) : [];
+    const busy = this.calendarIn(weekStart).filter((c) => c.kind === "busy").map((c) => c.date);
+    const asked = Array.isArray(input.quick) ? (input.quick as unknown[]).filter((d): d is string => isIsoDate(d)) : [];
+    const quick = [...new Set([...asked, ...busy])].sort();
     const seasonal = input.seasonal !== false;
 
     const seed = input.reshuffle ? Math.floor(Math.random() * 1e9) : [...weekStart].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 1e9;
@@ -249,7 +268,10 @@ export class ChefSession {
     }
     this.log(`Drafted the week of ${shortDate(weekStart)}`);
     const holidays = holidaysInWeek(weekStart);
-    this.lastDraft = { weekStart, nights: result.nights.map((n) => n.date), kidNights, shared: result.shared, holidays };
+    const planned = result.nights.map((n) => n.date);
+    const usual = defaultNights(weekStart, this.settings.dinnersPerWeek);
+    const calendar = this.calendarIn(weekStart).filter((c) => (c.kind === "busy" ? planned.includes(c.date) : usual.includes(c.date) && !planned.includes(c.date)));
+    this.lastDraft = { weekStart, nights: planned, kidNights, shared: result.shared, holidays, calendar };
     const openHolidays = holidays.filter(isOpenNight).map((h) => `${dayName(h.date)} (${h.name})`);
     const shared = result.shared.map((s) => `${s.name} ×${s.nights}`).join(", ") || "none";
     return {

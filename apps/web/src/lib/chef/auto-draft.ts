@@ -11,6 +11,7 @@ import { addDays, dayName, weekStartOf, weekdayIndex } from "./dates";
 import { defaultNights, holidayWeekName, isOpenNight } from "./holidays";
 import { ChefSession, type Choice, type DraftSummary } from "./session";
 import type { ChefStore } from "./store";
+import type { CalendarNight } from "./calendar";
 
 export type AutoDraftMessage = { weekStart: string; body: string; choice: Choice; changes: string[] };
 
@@ -48,6 +49,13 @@ export function draftMessage(draft: DraftSummary, today: string): string {
     const names = draft.shared.slice(0, 2).map((s) => `**${s.name}**`);
     parts.push(`It shares ${names.join(" and ")} across nights.`);
   }
+  const busy = draft.calendar.filter((c) => c.kind === "busy");
+  const away = draft.calendar.filter((c) => c.kind === "away");
+  if (away.length) parts.push(`Your calendar has you away ${away.map((c) => dayName(c.date)).join(" and ")}, so I left ${away.length === 1 ? "it" : "them"} open.`);
+  if (busy.length) {
+    const what = busy.map((c) => `${dayName(c.date)} (${c.titles[0].replace(/ at .*$/, "")})`);
+    parts.push(`${what.join(" and ")} ${busy.length === 1 ? "gets" : "get"} a dinner of 30 minutes or less.`);
+  }
   if (draft.kidNights) parts.push(`The kids share ${draft.kidNights}, like last week.`);
   parts.push("Anything in particular this week? A craving, a busy night, people over?");
   return parts.join(" ");
@@ -61,10 +69,13 @@ export async function ensureDrafts(opts: {
   store: ChefStore;
   today: string;
   hasDrafted: (weekStart: string) => Promise<boolean>;
+  /** The household calendar's nights, read only when a week needs drafting. */
+  calendar?: () => Promise<CalendarNight[] | null>;
 }): Promise<AutoDraftMessage[]> {
   const { store, today } = opts;
   const settings = await store.settings();
   const out: AutoDraftMessage[] = [];
+  let calendar: CalendarNight[] | null | undefined;
   for (const weekStart of weeksToDraft(today, settings.dinnersPerWeek)) {
     const end = addDays(weekStart, 6);
     const [plans, dinners] = await Promise.all([store.plans(weekStart, weekStart), store.dinners(addDays(weekStart, -7), end)]);
@@ -78,11 +89,14 @@ export async function ensureDrafts(opts: {
 
     const session = new ChefSession(store, today);
     await session.load();
+    if (calendar === undefined) calendar = opts.calendar ? await opts.calendar().catch(() => null) : null;
+    session.calendar = calendar;
     const lastWeek = dinners.filter((d) => d.date < weekStart && d.status !== "moved");
     const kids = lastWeek.filter((d) => d.sharedWithKids && d.status !== "skipped").length;
     // Only fill empty nights, so carried-over dinners stay where they are.
     const taken = new Set(dinners.filter((d) => d.date >= weekStart && d.status !== "moved").map((d) => d.date));
-    const nights = defaultNights(weekStart, settings.dinnersPerWeek).filter((d) => d >= today && !taken.has(d));
+    const away = new Set(session.calendarIn(weekStart).filter((c) => c.kind === "away").map((c) => c.date));
+    const nights = defaultNights(weekStart, settings.dinnersPerWeek).filter((d) => d >= today && !taken.has(d) && !away.has(d));
     if (!nights.length) continue;
     const result = await session.planWeekTool({ week_start: weekStart, nights, kid_nights: kids });
     if (!result.ok || !session.lastDraft) continue;
