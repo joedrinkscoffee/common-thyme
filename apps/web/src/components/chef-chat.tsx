@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ChefAvatar } from "./chef-avatar";
 import type { Brief, Segment } from "@/lib/chef/brief";
@@ -9,6 +9,8 @@ import { checkInDinner } from "@/app/chef-actions";
 
 const STICKERS = ["bg-lemon", "bg-caper", "bg-kale"];
 const LONG_EDGE = 1568;
+/** The chat box grows with the text up to this height (about 7 lines), then scrolls. */
+const INPUT_MAX_HEIGHT = 196;
 const NOT_CONNECTED = "I'm not hooked up yet, so I can't act on that. Once the Anthropic key is in, I'll change the week right here.";
 
 type Photo = { data: string; type: string; preview: string };
@@ -97,7 +99,18 @@ export function ChefChat({
   const [checkInBusy, startCheckIn] = useTransition();
   const [answeredCheckIn, setAnsweredCheckIn] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const logEnd = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the chat box to fit what's typed, up to INPUT_MAX_HEIGHT, then scroll inside it.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const height = Math.min(el.scrollHeight + 4, INPUT_MAX_HEIGHT); // + the 2px border on each side
+    el.style.height = `${height}px`;
+    el.style.overflowY = el.scrollHeight + 4 > INPUT_MAX_HEIGHT ? "auto" : "hidden";
+  }, [draft]);
 
   // A refresh (after a check-in or a change) brings the saved conversation from the server.
   const [loaded, setLoaded] = useState(initialMessages);
@@ -106,7 +119,9 @@ export function ChefChat({
     setMessages(initialMessages);
   }
   useEffect(() => {
-    if (messages.length || thinking) logEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // The panel has a fixed height and the conversation scrolls inside it: keep the newest message in view.
+    const el = log.current;
+    if (el && (messages.length || thinking)) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages.length, thinking]);
 
   const busy = thinking || checkInBusy;
@@ -169,9 +184,9 @@ export function ChefChat({
   return (
     <section
       aria-label="Chat with Chef"
-      className="flex min-w-0 max-w-[720px] flex-[999_1_600px] flex-col overflow-hidden rounded-[28px] border-2 border-ink bg-paper lg:min-h-[640px]"
+      className="flex min-w-0 max-w-[720px] flex-[999_1_600px] flex-col overflow-hidden rounded-[28px] border-2 border-ink bg-paper h-[calc(100dvh-9.5rem)] min-h-[480px] sm:h-[calc(100dvh-7rem)] lg:sticky lg:top-4 lg:h-[calc(100dvh-6.5rem)]"
     >
-      <header className="flex items-center gap-3 border-b-2 border-line px-5 py-4 sm:px-6">
+      <header className="flex flex-none items-center gap-3 border-b-2 border-line px-5 py-4 sm:px-6">
         <ChefAvatar size={44} />
         <div>
           <div className="font-display text-xl font-extrabold leading-tight">Chef</div>
@@ -179,7 +194,7 @@ export function ChefChat({
         </div>
       </header>
 
-      <div role="log" aria-live="polite" className="flex flex-1 flex-col gap-4 px-5 py-5 sm:px-6">
+      <div ref={log} role="log" aria-live="polite" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
         <div className="flex flex-col gap-3.5 text-[17px] leading-relaxed">
           {brief.paragraphs.map((p, i) => (
             <Paragraph key={i} segments={p} />
@@ -193,7 +208,7 @@ export function ChefChat({
             return (
               <div key={m.id} className="flex max-w-[85%] flex-col items-end self-end">
                 {partner && <span className="mb-1 text-xs font-semibold text-muted">{m.author}</span>}
-                <p className="m-0 rounded-[18px] rounded-br-[4px] bg-ink px-4 py-2.5 text-cream">{m.body}</p>
+                <p className="m-0 whitespace-pre-wrap rounded-[18px] rounded-br-[4px] bg-ink px-4 py-2.5 text-cream">{m.body}</p>
               </div>
             );
           }
@@ -267,10 +282,9 @@ export function ChefChat({
             {error}
           </p>
         )}
-        <div ref={logEnd} />
       </div>
 
-      <footer className="border-t-2 border-line bg-cream/60 px-4 pb-4 pt-3 sm:px-5">
+      <footer className="flex-none border-t-2 border-line bg-cream/60 px-4 pb-4 pt-3 sm:px-5">
         {!openChoice && (
           <div className="mb-3 flex flex-wrap gap-2" aria-label="Suggestions">
             {brief.suggestions.map((s) => (
@@ -296,7 +310,7 @@ export function ChefChat({
           </div>
         )}
         <form
-          className="flex gap-2"
+          className="flex items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void send(draft);
@@ -332,13 +346,24 @@ export function ChefChat({
           <label htmlFor="chef-input" className="sr-only">
             Tell Chef what&apos;s going on
           </label>
-          <input
+          <textarea
+            ref={inputRef}
             id="chef-input"
+            rows={1}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sends; Shift+Enter starts a new line. Leave Enter alone while an IME is composing.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+            enterKeyHint="send"
             placeholder={photo ? "What's this? (optional)" : "Tell Chef what's going on this week…"}
             maxLength={4000}
-            className="min-h-[52px] min-w-0 flex-1 rounded-full border-2 border-ink bg-paper px-5 text-base"
+            style={{ maxHeight: INPUT_MAX_HEIGHT }}
+            className="block min-h-[52px] min-w-0 flex-1 resize-none overflow-y-hidden rounded-[26px] border-2 border-ink bg-paper px-5 py-3 text-base leading-6"
           />
           <button
             type="submit"
