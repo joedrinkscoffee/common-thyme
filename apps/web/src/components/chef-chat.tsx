@@ -99,7 +99,7 @@ export function ChefChat({
   const [checkInBusy, startCheckIn] = useTransition();
   const [answeredCheckIn, setAnsweredCheckIn] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const logEnd = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Grow the chat box to fit what's typed, up to INPUT_MAX_HEIGHT, then scroll inside it.
@@ -119,7 +119,9 @@ export function ChefChat({
     setMessages(initialMessages);
   }
   useEffect(() => {
-    if (messages.length || thinking) logEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // The panel has a fixed height and the conversation scrolls inside it: keep the newest message in view.
+    const el = log.current;
+    if (el && (messages.length || thinking)) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages.length, thinking]);
 
   const busy = thinking || checkInBusy;
@@ -182,9 +184,9 @@ export function ChefChat({
   return (
     <section
       aria-label="Chat with Chef"
-      className="flex min-w-0 max-w-[720px] flex-[999_1_600px] flex-col overflow-hidden rounded-[28px] border-2 border-ink bg-paper lg:min-h-[640px]"
+      className="flex min-w-0 max-w-[720px] flex-[999_1_600px] flex-col overflow-hidden rounded-[28px] border-2 border-ink bg-paper h-[calc(100dvh-9.5rem)] min-h-[480px] sm:h-[calc(100dvh-7rem)] lg:sticky lg:top-4 lg:h-[calc(100dvh-6.5rem)]"
     >
-      <header className="flex items-center gap-3 border-b-2 border-line px-5 py-4 sm:px-6">
+      <header className="flex flex-none items-center gap-3 border-b-2 border-line px-5 py-4 sm:px-6">
         <ChefAvatar size={44} />
         <div>
           <div className="font-display text-xl font-extrabold leading-tight">Chef</div>
@@ -192,7 +194,7 @@ export function ChefChat({
         </div>
       </header>
 
-      <div role="log" aria-live="polite" className="flex flex-1 flex-col gap-4 px-5 py-5 sm:px-6">
+      <div ref={log} role="log" aria-live="polite" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
         <div className="flex flex-col gap-3.5 text-[17px] leading-relaxed">
           {brief.paragraphs.map((p, i) => (
             <Paragraph key={i} segments={p} />
@@ -280,10 +282,9 @@ export function ChefChat({
             {error}
           </p>
         )}
-        <div ref={logEnd} />
       </div>
 
-      <footer className="border-t-2 border-line bg-cream/60 px-4 pb-4 pt-3 sm:px-5">
+      <footer className="flex-none border-t-2 border-line bg-cream/60 px-4 pb-4 pt-3 sm:px-5">
         {!openChoice && (
           <div className="mb-3 flex flex-wrap gap-2" aria-label="Suggestions">
             {brief.suggestions.map((s) => (
