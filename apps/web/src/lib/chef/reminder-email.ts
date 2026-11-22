@@ -31,7 +31,7 @@ export function buildReminderEmail(opts: {
     kind === "thursday"
       ? n === 1
         ? `Did you make ${dinners[0].title}?`
-        : `Quick check-in: ${n} dinners this week`
+        : `Quick check-in: ${n} meals this week`
       : n === 1
         ? `Before I plan next week: did you make ${dinners[0].title}?`
         : `Before I plan next week: did you make these ${n}?`;

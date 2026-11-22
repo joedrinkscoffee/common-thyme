@@ -36,7 +36,7 @@ export type CheckInResult =
 const isLive = (d: StoredDinner) => d.status === "planned" || d.status === "cooked";
 
 async function recipeTitle(store: ChefStore, recipeId: string) {
-  return (await store.recipe(recipeId))?.title ?? "That dinner";
+  return (await store.recipe(recipeId))?.title ?? "That meal";
 }
 
 /** The first night from `from` through `to` with no planned or cooked dinner. */
@@ -91,7 +91,7 @@ async function push(store: ChefStore, d: StoredDinner, weekStart: string, today:
 /** Applies one check-in answer to a dinner. */
 export async function applyCheckIn(store: ChefStore, dinnerId: string, action: CheckInAction, today: string): Promise<CheckInResult> {
   const d = await store.dinner(dinnerId);
-  if (!d) return { ok: false, error: "That dinner isn't in your plan anymore." };
+  if (!d) return { ok: false, error: "That meal isn't in your plan anymore." };
   const title = await recipeTitle(store, d.recipeId);
   if (d.status === "moved") return { ok: false, error: `${title} was already moved to another night.` };
   if (d.status === "cooked") return { ok: false, error: `${title} is already marked cooked.` };
@@ -127,7 +127,7 @@ export async function applyCheckIn(store: ChefStore, dinnerId: string, action: C
 /** Undoes a check-in answer: the dinner is back to planned, and any copy it was moved to is removed. */
 export async function undoCheckIn(store: ChefStore, dinnerId: string): Promise<CheckInResult> {
   const d = await store.dinner(dinnerId);
-  if (!d) return { ok: false, error: "That dinner isn't in your plan anymore." };
+  if (!d) return { ok: false, error: "That meal isn't in your plan anymore." };
   const title = await recipeTitle(store, d.recipeId);
   if (d.status === "planned") return { ok: false, error: `${title} isn't marked, so there's nothing to undo.` };
   if (d.status === "moved" && d.movedTo) {

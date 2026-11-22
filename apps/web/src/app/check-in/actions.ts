@@ -15,7 +15,7 @@ export async function answerFromLink(token: string): Promise<LinkOutcome> {
   if (!claim) return { ok: false, error: "This link has expired. Open Chef to check in instead." };
 
   const { data: dinner } = await admin.from("planned_dinners").select("household_id").eq("id", claim.dinnerId).maybeSingle();
-  if (!dinner) return { ok: false, error: "That dinner isn't in your plan anymore." };
+  if (!dinner) return { ok: false, error: "That meal isn't in your plan anymore." };
   const { data: member } = await admin
     .from("household_members")
     .select("user_id")

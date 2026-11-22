@@ -252,7 +252,7 @@ export function ChefChat({
               Did you make {checkIn.title} {checkIn.when}?
             </p>
             <p className="mb-0 mt-1 text-[15px] text-muted">
-              {checkIn.waiting > 1 ? `${checkIn.waiting} dinners this week still need a check-in. ` : ""}
+              {checkIn.waiting > 1 ? `${checkIn.waiting} meals this week still need a check-in. ` : ""}
               If not, I can move it while the fresh stuff is still good.
             </p>
             <div role="group" aria-label="Check in" className="mt-3 flex flex-wrap gap-2">
