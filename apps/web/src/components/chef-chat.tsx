@@ -6,6 +6,7 @@ import { ChefAvatar } from "./chef-avatar";
 import type { Brief, Segment } from "@/lib/chef/brief";
 import type { ChefTurnResponse, HomeMessage } from "@/lib/chef/home";
 import { checkInDinner } from "@/app/chef-actions";
+import type { CheckInAction } from "@/lib/chef/check-in";
 
 const STICKERS = ["bg-lemon", "bg-caper", "bg-kale"];
 const LONG_EDGE = 1568;
@@ -153,16 +154,19 @@ export function ChefChat({
     }
   }
 
-  function answerCheckIn(status: "cooked" | "skipped") {
-    if (!checkIn) return;
-    if (!connected && sample) {
-      setAnsweredCheckIn(checkIn.dinnerId);
+  function answerCheckIn(action: CheckInAction | "undo", dinnerId: string | undefined = checkIn?.dinnerId) {
+    if (!dinnerId) return;
+    if (sample) {
+      if (action !== "undo") setAnsweredCheckIn(dinnerId);
       return;
     }
     startCheckIn(async () => {
-      const result = await checkInDinner(checkIn.dinnerId, status);
+      const result = await checkInDinner(dinnerId, action);
       if (!result.ok) setError(result.error ?? "Couldn't save that.");
-      else setAnsweredCheckIn(checkIn.dinnerId);
+      else {
+        setError(null);
+        setAnsweredCheckIn(action === "undo" ? null : dinnerId);
+      }
     });
   }
 
@@ -218,12 +222,24 @@ export function ChefChat({
                 </div>
               )}
               {m.changes.length > 0 && (
-                <ul aria-label="What Chef changed" className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                <ul aria-label="What Chef changed" className="m-0 flex list-none flex-wrap items-center gap-1.5 p-0">
                   {m.changes.map((c, j) => (
                     <li key={j} className="rounded-full border-[1.5px] border-ink bg-caper px-2.5 py-0.5 text-[12px] font-bold">
                       ✓ {c}
                     </li>
                   ))}
+                  {m.undo && isLast && (
+                    <li>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => answerCheckIn("undo", m.undo ?? undefined)}
+                        className="rounded-full border-[1.5px] border-ink bg-paper px-2.5 py-0.5 text-[12px] font-bold transition-colors hover:bg-lemon disabled:opacity-60"
+                      >
+                        Undo
+                      </button>
+                    </li>
+                  )}
                 </ul>
               )}
             </div>
@@ -235,18 +251,23 @@ export function ChefChat({
             <p className="m-0 font-display text-xl font-extrabold leading-tight">
               Did you make {checkIn.title} {checkIn.when}?
             </p>
-            <p className="mb-0 mt-1 text-[15px] text-muted">If not, I can move it while the fresh stuff is still good.</p>
+            <p className="mb-0 mt-1 text-[15px] text-muted">
+              {checkIn.waiting > 1 ? `${checkIn.waiting} dinners this week still need a check-in. ` : ""}
+              If not, I can move it while the fresh stuff is still good.
+            </p>
             <div role="group" aria-label="Check in" className="mt-3 flex flex-wrap gap-2">
               <button type="button" disabled={busy} onClick={() => answerCheckIn("cooked")} className={bigChip}>
                 We made it
               </button>
-              <button type="button" disabled={busy} onClick={() => {
-                  setAnsweredCheckIn(checkIn.dinnerId);
-                  void send(`We didn't make ${checkIn.title} ${checkIn.when}. Can you move it?`, null);
-                }} className={bigChip}>
-                Move it
+              {checkIn.later && (
+                <button type="button" disabled={busy} onClick={() => answerCheckIn("later")} className={bigChip}>
+                  Later this week
+                </button>
+              )}
+              <button type="button" disabled={busy} onClick={() => answerCheckIn("next_week")} className={bigChip}>
+                Next week
               </button>
-              <button type="button" disabled={busy} onClick={() => answerCheckIn("skipped")} className={bigChip}>
+              <button type="button" disabled={busy} onClick={() => answerCheckIn("skip")} className={bigChip}>
                 Skip it
               </button>
             </div>

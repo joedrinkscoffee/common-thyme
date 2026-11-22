@@ -15,6 +15,8 @@ import {
   type NewRecipe,
   type PlanStatus,
   type RecipeFacts,
+  type DinnerPatch,
+  type NewDinner,
   type StoredDinner,
   type StoredPlan,
 } from "./store";
@@ -31,8 +33,9 @@ type DinnerRow = {
   servings: number;
   status: StoredDinner["status"];
   moved_to: string | null;
+  push_count: number;
 };
-const DINNER_COLUMNS = "id, plan_id, date, recipe_id, shared_with_kids, servings, status, moved_to";
+const DINNER_COLUMNS = "id, plan_id, date, recipe_id, shared_with_kids, servings, status, moved_to, push_count";
 const toDinner = (r: DinnerRow): StoredDinner => ({
   id: r.id,
   planId: r.plan_id,
@@ -42,6 +45,7 @@ const toDinner = (r: DinnerRow): StoredDinner => ({
   servings: r.servings,
   status: r.status,
   movedTo: r.moved_to,
+  pushCount: r.push_count ?? 0,
 });
 
 function fail(what: string, error: { message: string } | null): never {
@@ -259,7 +263,13 @@ export class SupabaseChefStore implements ChefStore {
     return ((data ?? []) as DinnerRow[]).map(toDinner);
   }
 
-  async addDinner(d: Omit<StoredDinner, "id" | "status" | "movedTo">): Promise<StoredDinner> {
+  async dinner(id: string): Promise<StoredDinner | null> {
+    const { data, error } = await this.db.from("planned_dinners").select(DINNER_COLUMNS).eq("id", id).eq("household_id", this.householdId).maybeSingle();
+    if (error) fail("read dinner", error);
+    return data ? toDinner(data as DinnerRow) : null;
+  }
+
+  async addDinner(d: NewDinner): Promise<StoredDinner> {
     const { data, error } = await this.db
       .from("planned_dinners")
       .insert({
@@ -269,6 +279,7 @@ export class SupabaseChefStore implements ChefStore {
         date: d.date,
         shared_with_kids: d.sharedWithKids,
         servings: d.servings,
+        push_count: d.pushCount ?? 0,
       })
       .select(DINNER_COLUMNS)
       .single();
@@ -276,12 +287,16 @@ export class SupabaseChefStore implements ChefStore {
     return toDinner(data as DinnerRow);
   }
 
-  async updateDinner(id: string, patch: Partial<Pick<StoredDinner, "recipeId" | "sharedWithKids" | "servings" | "status" | "movedTo">>) {
+  async updateDinner(id: string, patch: DinnerPatch) {
     const row: Record<string, unknown> = {};
     if (patch.recipeId !== undefined) row.recipe_id = patch.recipeId;
     if (patch.sharedWithKids !== undefined) row.shared_with_kids = patch.sharedWithKids;
     if (patch.servings !== undefined) row.servings = patch.servings;
-    if (patch.status !== undefined) row.status = patch.status;
+    if (patch.status !== undefined) {
+      row.status = patch.status;
+      row.cooked_at = patch.status === "cooked" ? new Date().toISOString() : null;
+      row.cooked_by = patch.status === "cooked" ? this.userId : null;
+    }
     if (patch.movedTo !== undefined) row.moved_to = patch.movedTo;
     const { error } = await this.db.from("planned_dinners").update(row).eq("id", id).eq("household_id", this.householdId);
     if (error) fail("update dinner", error);

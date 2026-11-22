@@ -210,7 +210,9 @@ describe("stock-up items across weeks", () => {
       r("soup", ["leek"]),
     ]);
     const plan = await store.ensurePlan("2026-11-23");
-    await store.addDinner({ planId: plan.id, date: "2026-11-24", recipeId: "bread", sharedWithKids: false, servings: 2 });
+    const bread = await store.addDinner({ planId: plan.id, date: "2026-11-24", recipeId: "bread", sharedWithKids: false, servings: 2 });
+    // Cooked, so it isn't carried into next week.
+    await store.updateDinner(bread.id, { status: "cooked" });
     const session = new ChefSession(store, TODAY);
     await session.load();
     session.settings = { ...session.settings, dinnersPerWeek: 1, noRepeatWeeks: 1 };

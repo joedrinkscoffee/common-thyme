@@ -30,7 +30,8 @@ export type Segment = string | { bold: string } | { sticker: string };
 
 export type Brief = {
   paragraphs: Segment[][];
-  checkIn: { dinnerId: string; title: string; when: string } | null;
+  /** One unmarked dinner to ask about; `later` is false when the week has no nights left. */
+  checkIn: { dinnerId: string; title: string; when: string; later: boolean; waiting: number } | null;
   suggestions: string[];
 };
 
@@ -115,9 +116,13 @@ export function buildBrief(opts: {
 
   // The one thing to ask: the most recent dinner nobody checked in on.
   const missed = live
-    .filter((d) => d.status === "planned" && d.date < today && d.date >= addDays(today, -4))
+    .filter((d) => d.status === "planned" && d.date < today && d.date >= addDays(today, -6))
     .sort((a, b) => b.date.localeCompare(a.date))[0];
-  const checkIn = missed ? { dinnerId: missed.id, title: missed.title, when: relativeDay(missed.date, today) } : null;
+  const waiting = live.filter((d) => d.status === "planned" && d.date < today).length;
+  const openNights = weekDates(thisWeek.weekStart).filter((n) => n >= today && !live.some((d) => d.date === n && d.status !== "skipped"));
+  const checkIn = missed
+    ? { dinnerId: missed.id, title: missed.title, when: relativeDay(missed.date, today), later: openNights.length > 0, waiting }
+    : null;
 
   // Next week, once it's close.
   if (lateWeek || !upcoming.length) {

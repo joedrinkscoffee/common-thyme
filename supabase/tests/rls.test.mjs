@@ -172,3 +172,25 @@ test("a deleted recipe stays in past plans and can be restored", async () => {
   await as(JOE, `update public.recipes set archived_at = null where id = '${recipe.id}'`);
   assert.equal((await as(JOE, `select count(*)::int as n from public.recipes where archived_at is null`))[0].n, 1);
 });
+
+test("check-in columns exist, and only the server can see reminder email records", async () => {
+  const { db, as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  const [{ id: recipe }] = await as(JOE, `insert into public.recipes (household_id, title) values ('${household}', 'Piccata') returning id`);
+  const [{ id: plan }] = await as(JOE, `insert into public.meal_plans (household_id, week_start) values ('${household}', '2026-11-23') returning id`);
+  const [dinner] = await as(
+    JOE,
+    `insert into public.planned_dinners (plan_id, household_id, recipe_id, date, servings, status, cooked_at, cooked_by)
+     values ('${plan}', '${household}', '${recipe}', '2026-11-24', 2, 'cooked', now(), '${JOE}') returning push_count`,
+  );
+  assert.equal(dinner.push_count, 0);
+  await as(JOE, `update public.profiles set timezone = 'America/Chicago' where id = '${JOE}'`);
+
+  await db.exec(`reset role; insert into public.check_in_emails (household_id, user_id, kind, week_start, sent)
+    values ('${household}', '${JOE}', 'thursday', '2026-11-23', true)`);
+  await assert.rejects(as(JOE, "select * from public.check_in_emails"));
+  await assert.rejects(
+    db.exec(`reset role; insert into public.check_in_emails (household_id, user_id, kind, week_start, sent)
+      values ('${household}', '${JOE}', 'thursday', '2026-11-23', true)`),
+  );
+});

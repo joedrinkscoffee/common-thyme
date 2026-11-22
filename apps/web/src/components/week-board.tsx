@@ -1,14 +1,18 @@
 import Link from "next/link";
 import type { HomeDinner, HomeWeek } from "@/lib/chef/brief";
-import { dayName } from "@/lib/chef/dates";
+import { dayName, weekStartOf } from "@/lib/chef/dates";
+import { DinnerMark } from "./dinner-mark";
 
 const TINTS = ["#f0b98a", "#9fcb8a", "#f2cf78", "#bfd48e", "#e7d3b0"];
 
-function DinnerTile({ dinner, today, i }: { dinner: HomeDinner; today: string; i: number }) {
+function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: string; i: number; sample: boolean }) {
   const done = dinner.status === "cooked";
   const skipped = dinner.status === "skipped";
   const tonight = dinner.date === today && dinner.status === "planned";
+  // Dinners this week (or earlier) can be marked; later weeks haven't happened yet.
+  const markable = weekStartOf(dinner.date) <= weekStartOf(today) && dinner.status !== "moved";
   return (
+    <div className="flex flex-col">
     <Link
       href={`/recipes/${dinner.recipeId}`}
       className="group block overflow-hidden rounded-2xl border-2 border-ink bg-paper text-ink no-underline transition-[translate,box-shadow] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-pop motion-reduce:transition-none"
@@ -37,11 +41,13 @@ function DinnerTile({ dinner, today, i }: { dinner: HomeDinner; today: string; i
         {skipped && <div className="mt-0.5 text-[12px] text-muted">Skipped</div>}
       </div>
     </Link>
+    {markable && <DinnerMark dinnerId={dinner.id} status={dinner.status as "planned" | "cooked" | "skipped"} title={dinner.title} sample={sample} />}
+    </div>
   );
 }
 
 /** The week beside the chat: square dinner tiles, newest week below. */
-export function WeekBoard({ weeks, today }: { weeks: HomeWeek[]; today: string }) {
+export function WeekBoard({ weeks, today, sample = false }: { weeks: HomeWeek[]; today: string; sample?: boolean }) {
   return (
     <aside aria-label="Your weeks" className="flex min-w-[280px] flex-[1_1_360px] flex-col gap-7">
       {weeks.map((w) => (
@@ -56,7 +62,7 @@ export function WeekBoard({ weeks, today }: { weeks: HomeWeek[]; today: string }
           {w.dinners.length ? (
             <div className="grid grid-cols-3 gap-3">
               {w.dinners.map((d, i) => (
-                <DinnerTile key={d.id} dinner={d} today={today} i={i} />
+                <DinnerTile key={d.id} dinner={d} today={today} i={i} sample={sample} />
               ))}
             </div>
           ) : (

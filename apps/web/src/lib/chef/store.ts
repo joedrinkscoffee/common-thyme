@@ -19,7 +19,12 @@ export type StoredDinner = {
   servings: number;
   status: DinnerStatus;
   movedTo: string | null;
+  /** How many times this dinner was pushed to a later week (0 for a fresh one). */
+  pushCount: number;
 };
+
+export type NewDinner = Omit<StoredDinner, "id" | "status" | "movedTo" | "pushCount"> & { pushCount?: number };
+export type DinnerPatch = Partial<Pick<StoredDinner, "recipeId" | "sharedWithKids" | "servings" | "status" | "movedTo">>;
 
 export type StoredPlan = { id: string; weekStart: string; status: PlanStatus };
 
@@ -73,8 +78,10 @@ export interface ChefStore {
   setPlanStatus(planId: string, status: PlanStatus): Promise<void>;
 
   dinners(from: string, to: string): Promise<StoredDinner[]>;
-  addDinner(d: Omit<StoredDinner, "id" | "status" | "movedTo">): Promise<StoredDinner>;
-  updateDinner(id: string, patch: Partial<Pick<StoredDinner, "recipeId" | "sharedWithKids" | "servings" | "status" | "movedTo">>): Promise<void>;
+  dinner(id: string): Promise<StoredDinner | null>;
+  addDinner(d: NewDinner): Promise<StoredDinner>;
+  /** Setting status "cooked" also records when and by whom; any other status clears that. */
+  updateDinner(id: string, patch: DinnerPatch): Promise<void>;
   deleteDinner(id: string): Promise<void>;
 
   notes(): Promise<ChefNote[]>;

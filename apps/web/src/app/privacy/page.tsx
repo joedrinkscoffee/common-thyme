@@ -22,8 +22,9 @@ export default function PrivacyPage() {
       <h2 className="mt-8 font-display text-xl font-extrabold">How it is used</h2>
       <p>
         Your data is used only to plan your dinners. Chef sends your recipes, plans and notes to Anthropic&apos;s
-        Claude API to draft and adjust your week. We don&apos;t sell your data, show ads, or share it with anyone
-        else.
+        Claude API to draft and adjust your week. Check-in emails (Thursday evening and Sunday morning, only when
+        dinners are still unmarked) are sent through Resend, which receives your email address and the dinner names.
+        We don&apos;t sell your data, show ads, or share it with anyone else.
       </p>
 
       <h2 className="mt-8 font-display text-xl font-extrabold">Who can see it</h2>

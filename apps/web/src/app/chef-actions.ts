@@ -2,34 +2,35 @@
 
 import { refresh } from "next/cache";
 import { getViewer } from "@/lib/household";
-import { chefContext, saveMessage } from "@/lib/chef/server";
+import { createClient } from "@/lib/supabase/server";
+import { CHECK_IN_ACTIONS, type CheckInAction } from "@/lib/chef/check-in";
+import { performCheckIn } from "@/lib/chef/check-in-server";
 
-/** A quick check-in answer, without asking the model: "cooked it" or "skipped it". */
-export async function checkInDinner(dinnerId: string, status: "cooked" | "skipped"): Promise<{ ok: boolean; error?: string }> {
+type Outcome = { ok: boolean; error?: string };
+
+/** A check-in answer for one dinner, without asking the model: cooked, later this week, next week or skip. */
+export async function checkInDinner(dinnerId: string, action: CheckInAction | "undo"): Promise<Outcome> {
+  if (action !== "undo" && !CHECK_IN_ACTIONS.includes(action)) return { ok: false, error: "Unknown answer." };
   const viewer = await getViewer();
   if (viewer.kind !== "signed-in" || !viewer.household) return { ok: false, error: "Sign in first." };
-  const { db, store, today } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
-
-  const { data: d } = await db
-    .from("planned_dinners")
-    .select("id, date, status, recipes(title)")
-    .eq("id", dinnerId)
-    .eq("household_id", viewer.household.id)
-    .maybeSingle();
-  if (!d || d.status !== "planned") return { ok: false, error: "That dinner was already checked in." };
-  if (status === "cooked" && d.date > today) return { ok: false, error: "That dinner is still ahead." };
-  const recipe = (Array.isArray(d.recipes) ? d.recipes[0] : d.recipes) as { title: string } | null;
-  const title = recipe?.title ?? "that dinner";
-
-  await store.updateDinner(dinnerId, { status });
-  const household = viewer.household.id;
-  await saveMessage(db, household, { role: "user", authorId: viewer.userId, body: status === "cooked" ? `We made ${title}.` : `We skipped ${title}.` });
-  await saveMessage(db, household, {
-    role: "chef",
-    authorId: null,
-    body: status === "cooked" ? `Nice. ${title} is marked cooked.` : `Got it, ${title} is skipped. If you'd still like to make it, ask me to move it to another night.`,
-    payload: { changes: [status === "cooked" ? `Marked ${title} cooked` : `Marked ${title} skipped`] },
-  });
+  const db = await createClient();
+  const result = await performCheckIn({ db, householdId: viewer.household.id, userId: viewer.userId, dinnerId, action });
+  if (!result.ok) return { ok: false, error: result.error };
   refresh();
   return { ok: true };
+}
+
+/** Remembers the browser's time zone, so reminder emails arrive at the right local hour. */
+export async function saveTimezone(timeZone: string): Promise<Outcome> {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+  } catch {
+    return { ok: false };
+  }
+  if (timeZone.length > 64) return { ok: false };
+  const viewer = await getViewer();
+  if (viewer.kind !== "signed-in") return { ok: false };
+  const db = await createClient();
+  const { error } = await db.from("profiles").update({ timezone: timeZone }).eq("id", viewer.userId);
+  return { ok: !error };
 }

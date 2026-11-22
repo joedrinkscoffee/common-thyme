@@ -5,6 +5,7 @@ import { CreateHousehold } from "@/components/create-household";
 import { InvitePartner } from "@/components/invite-partner";
 import { SiteHeader } from "@/components/site-header";
 import { WeekBoard } from "@/components/week-board";
+import { TimezoneSync } from "@/components/timezone-sync";
 import { getViewer } from "@/lib/household";
 import { loadChefHome } from "@/lib/chef/server";
 import { sampleHome } from "@/lib/chef/sample-home";
@@ -22,7 +23,7 @@ function Home({ data, statusLabel, partnerSlot = null, sample = false }: { data:
         partnerSlot={partnerSlot}
         sample={sample}
       />
-      <WeekBoard weeks={data.weeks} today={data.today} />
+      <WeekBoard weeks={data.weeks} today={data.today} sample={sample} />
     </main>
   );
 }
@@ -39,7 +40,12 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ day?: str
 
   const data = await loadChefHome({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
   const status = data.connected ? viewer.household.name : `${viewer.household.name} · Chef isn't connected yet`;
-  return <Home data={data} statusLabel={status} partnerSlot={viewer.household.memberCount < 2 ? <InvitePartner /> : null} />;
+  return (
+    <>
+      <TimezoneSync />
+      <Home data={data} statusLabel={status} partnerSlot={viewer.household.memberCount < 2 ? <InvitePartner /> : null} />
+    </>
+  );
 }
 
 function HomeLoading() {

@@ -14,6 +14,8 @@ export type HomeMessage = {
   body: string;
   choice: Choice | null;
   changes: string[];
+  /** A check-in answer this message reports, which Undo reverses. */
+  undo?: string | null;
   at: string;
 };
 
