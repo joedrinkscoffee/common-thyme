@@ -4,6 +4,7 @@
  * sample preview use the in-memory one.
  */
 import type { CatalogRecipe } from "./planner";
+import type { ShareTier } from "./ingredient-tier";
 
 export type DinnerStatus = "planned" | "cooked" | "skipped" | "moved";
 export type PlanStatus = "draft" | "approved";
@@ -64,6 +65,8 @@ export interface ChefStore {
   catalog(): Promise<CatalogRecipe[]>;
   recipe(id: string): Promise<RecipeFacts | null>;
   createRecipe(recipe: NewRecipe): Promise<CreateRecipeResult>;
+  /** Sets how much Chef cares about sharing an ingredient; returns how many ingredients matched. */
+  setIngredientTier(name: string, tier: ShareTier): Promise<number>;
 
   plans(from: string, to: string): Promise<StoredPlan[]>;
   ensurePlan(weekStart: string): Promise<StoredPlan>;

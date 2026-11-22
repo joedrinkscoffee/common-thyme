@@ -14,7 +14,7 @@ export type HomeDinner = {
   photoUrl: string | null;
   sharedWithKids: boolean;
   status: DinnerStatus;
-  perishables: string[];
+  useUp: string[];
 };
 
 export type HomeWeek = {
@@ -36,7 +36,7 @@ export type Brief = {
 
 function sharedLeft(dinners: HomeDinner[]): { name: string; n: number }[] {
   const c = new Map<string, number>();
-  for (const d of dinners) for (const p of new Set(d.perishables)) c.set(p, (c.get(p) ?? 0) + 1);
+  for (const d of dinners) for (const p of new Set(d.useUp)) c.set(p, (c.get(p) ?? 0) + 1);
   return [...c.entries()]
     .filter(([, n]) => n > 1)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))

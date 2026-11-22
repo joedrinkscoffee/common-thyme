@@ -8,15 +8,16 @@ import { MemoryStore } from "./memory-store";
 import { planWeek, type CatalogRecipe } from "./planner";
 import { sampleRecipes } from "../sample-recipes";
 
-const PERISHABLES: Record<string, string[]> = {
-  "Chicken Piccata": ["lemon", "caper", "chicken cutlet"],
-  "Calabrian Shrimp & Orzo": ["shrimp", "lemon", "caper", "parsley"],
-  "Kale & Jack Quesadillas": ["kale", "monterey jack", "scallion"],
-  "Pesto Pasta & Lemon Ricotta": ["lemon", "ricotta", "basil"],
-  "Feta & Olive Pizza": ["feta", "pizza dough", "kale"],
-  "Miso & Shiitake Ramen": ["shiitake", "scallion", "kale"],
-  "Spicy Veracruz-Style Shrimp": ["shrimp", "tomato", "cilantro"],
-  "Cheddar & Spicy Red Onion Burgers": ["ground beef", "red onion", "cheddar"],
+// What each sample recipe shares, already sorted into tiers.
+const TIERS: Record<string, { useUp: string[]; pantry?: string[]; stockUp?: string[] }> = {
+  "Chicken Piccata": { useUp: ["chicken breast"], pantry: ["caper"] },
+  "Calabrian Shrimp & Orzo": { useUp: ["shrimp", "spinach"], pantry: ["caper", "calabrian chile paste"] },
+  "Kale & Jack Quesadillas": { useUp: ["kale", "scallion"], pantry: ["monterey jack", "flour tortilla"] },
+  "Pesto Pasta & Lemon Ricotta": { useUp: ["pesto", "ricotta", "spinach"], stockUp: ["pine nut"] },
+  "Feta & Olive Pizza": { useUp: ["feta", "kale"], pantry: ["pizza dough", "olive"] },
+  "Miso & Shiitake Ramen": { useUp: ["shiitake", "scallion", "miso"] },
+  "Spicy Veracruz-Style Shrimp": { useUp: ["shrimp", "tomato", "cilantro"], pantry: ["olive", "caper"] },
+  "Cheddar & Spicy Red Onion Burgers": { useUp: ["ground beef"], pantry: ["cheddar"] },
 };
 const KID_FRIENDLY = new Set(["Chicken Piccata", "Kale & Jack Quesadillas", "Pesto Pasta & Lemon Ricotta", "Cheddar & Spicy Red Onion Burgers"]);
 
@@ -27,7 +28,9 @@ export async function sampleHome(dayParam?: string): Promise<ChefHomeData> {
     title: r.title,
     tags: KID_FRIENDLY.has(r.title) ? [...r.tags.filter((t) => t !== "kid friendly"), "kid friendly"] : r.tags,
     totalMinutes: r.totalMinutes,
-    perishables: PERISHABLES[r.title] ?? [],
+    useUp: TIERS[r.title]?.useUp ?? [],
+    pantry: TIERS[r.title]?.pantry ?? [],
+    stockUp: TIERS[r.title]?.stockUp ?? [],
   }));
   const store = new MemoryStore(catalog);
   const thisWeek = weekStartOf(today);

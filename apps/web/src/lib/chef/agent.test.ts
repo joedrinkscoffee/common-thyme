@@ -32,9 +32,9 @@ function scripted(...replies: Anthropic.Beta.BetaMessage[]) {
 
 async function session() {
   const store = new MemoryStore([
-    { id: "piccata", title: "Chicken Piccata", tags: ["kid friendly"], totalMinutes: 35, perishables: ["lemon", "caper"] },
-    { id: "orzo", title: "Shrimp Orzo", tags: [], totalMinutes: 30, perishables: ["lemon", "caper", "shrimp"] },
-    { id: "pesto", title: "Pesto Pasta", tags: [], totalMinutes: 25, perishables: ["lemon", "basil"] },
+    { id: "piccata", title: "Chicken Piccata", tags: ["kid friendly"], totalMinutes: 35, useUp: ["parsley", "caper"] },
+    { id: "orzo", title: "Shrimp Orzo", tags: [], totalMinutes: 30, useUp: ["parsley", "caper", "shrimp"] },
+    { id: "pesto", title: "Pesto Pasta", tags: [], totalMinutes: 25, useUp: ["parsley", "basil"] },
   ]);
   const s = new ChefSession(store, "2026-11-21");
   await s.load();
@@ -46,11 +46,11 @@ describe("runChef", () => {
     const { store, s } = await session();
     const { call, calls } = scripted(
       msg([use("t1", "plan_week", { week_start: "2026-11-23", nights: ["2026-11-23", "2026-11-24"], kid_nights: 0 })], "tool_use"),
-      msg([text("Done. Next week leans on **lemon** twice.")], "end_turn"),
+      msg([text("Done. Next week leans on **parsley** twice.")], "end_turn"),
     );
     const reply = await runChef({ call, session: s, history: [], author: "Joe", text: "Plan next week, 2 nights", partnerJoined: false });
 
-    expect(reply.text).toBe("Done. Next week leans on **lemon** twice.");
+    expect(reply.text).toBe("Done. Next week leans on **parsley** twice.");
     expect(reply.changes).toEqual(["Drafted the week of Nov 23"]);
     expect(store.dinnerList).toHaveLength(2);
     expect(reply.usage).toEqual({ input: 200, cacheRead: 100, cacheWrite: 20, output: 40, calls: 2 });
@@ -61,7 +61,7 @@ describe("runChef", () => {
     const prompt = JSON.stringify(first.messages);
     expect(prompt).toContain("<household_state>");
     expect(prompt).toContain("Joe: Plan next week, 2 nights");
-    expect(JSON.stringify(first.system)).toContain("r1 | Chicken Piccata | 35 min | kid friendly | lemon, caper");
+    expect(JSON.stringify(first.system)).toContain("r1 | Chicken Piccata | 35 min | kid friendly | parsley, caper");
 
     // The second call replays the first answer and the tool result, unchanged.
     expect(calls[1].messages.slice(0, calls[0].messages.length)).toEqual(calls[0].messages);

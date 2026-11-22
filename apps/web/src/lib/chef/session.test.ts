@@ -4,11 +4,11 @@ import { ChefSession } from "./session";
 import type { CatalogRecipe } from "./planner";
 import type { FetchedPage } from "./fetch-page";
 
-const r = (id: string, perishables: string[], tags: string[] = []): CatalogRecipe => ({ id, title: id[0].toUpperCase() + id.slice(1), tags, totalMinutes: 30, perishables });
+const r = (id: string, useUp: string[], tags: string[] = []): CatalogRecipe => ({ id, title: id[0].toUpperCase() + id.slice(1), tags, totalMinutes: 30, useUp });
 const recipes = () => [
-  r("piccata", ["lemon", "caper", "chicken"], ["kid friendly"]),
-  r("orzo", ["lemon", "caper", "shrimp"]),
-  r("pesto", ["lemon", "ricotta", "basil"], ["kid friendly"]),
+  r("piccata", ["parsley", "caper", "chicken"], ["kid friendly"]),
+  r("orzo", ["parsley", "caper", "shrimp"]),
+  r("pesto", ["parsley", "ricotta", "basil"], ["kid friendly"]),
   r("quesadilla", ["kale", "jack"], ["kid friendly"]),
   r("ramen", ["kale", "shiitake"]),
   r("tacos", ["cilantro", "fish"]),
@@ -32,7 +32,7 @@ describe("plan_week", () => {
     const { store, session } = await setup();
     const out = await session.planWeekTool({ week_start: "2026-11-30", kid_nights: 1 });
     expect(out.ok).toBe(true);
-    expect(out.text).toContain("Perishables shared across nights: lemon");
+    expect(out.text).toContain("Use-up ingredients shared across nights: parsley");
     const dinners = live(store);
     expect(dinners.map((d) => d.date)).toEqual(["2026-11-30", "2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04"]);
     expect(dinners.filter((d) => d.sharedWithKids)).toHaveLength(1);
@@ -148,7 +148,8 @@ describe("recipes and notes", () => {
     const out = await session.addRecipeFromLinkTool({ url: "https://example.com/soup", perishable: ["kale", "lemon"] });
     expect(out.ok).toBe(true);
     expect(store.created[0]).toMatchObject({ title: "Green Soup", sourceUrl: "https://example.com/soup", servings: 4, perishable: ["kale", "lemon"], photo: { url: "https://example.com/soup.jpg" } });
-    expect(session.catalog.at(-1)!.perishables).toEqual(["kale", "lemon"]);
+    // Lemon is a cheap staple, so only the kale counts.
+    expect(session.catalog.at(-1)!.useUp).toEqual(["kale"]);
     expect(out.text).toMatch(/as r8 /);
   });
 
@@ -182,5 +183,39 @@ describe("recipes and notes", () => {
     expect(session.askTool({ question: "How many kid nights?", choices: ["None"] }).ok).toBe(false);
     expect(session.askTool({ question: "How many kid nights?", choices: ["None", "1", "2"] }).ok).toBe(true);
     expect(session.choice).toEqual({ question: "How many kid nights?", choices: ["None", "1", "2"] });
+  });
+
+  it("changes an ingredient's tier for every recipe that uses it", async () => {
+    const { store, session } = await setup();
+    const out = await session.setIngredientTierTool({ ingredient: "Capers", tier: "pantry" });
+    expect(out.ok).toBe(true);
+    const piccata = session.catalog.find((x) => x.id === "piccata")!;
+    expect(piccata.useUp).not.toContain("caper");
+    expect(piccata.pantry).toEqual(["capers"]);
+    expect((await store.catalog()).find((x) => x.id === "orzo")!.pantry).toEqual(["capers"]);
+    // Refs survive the reload.
+    expect(session.recipeRefFor("piccata")).toBe("r1");
+    expect(session.changes).toContain("Treating capers as nice to share");
+    expect((await session.setIngredientTierTool({ ingredient: "saffron", tier: "use_up" })).ok).toBe(false);
+    expect((await session.setIngredientTierTool({ ingredient: "kale", tier: "sometimes" })).ok).toBe(false);
+  });
+});
+
+describe("stock-up items across weeks", () => {
+  it("favors finishing walnuts bought for last week", async () => {
+    const store = new MemoryStore([
+      { ...r("salad", ["arugula"]), stockUp: ["walnut"] },
+      { ...r("bread", ["zucchini"]), stockUp: ["walnut"] },
+      r("stew", ["carrot"]),
+      r("soup", ["leek"]),
+    ]);
+    const plan = await store.ensurePlan("2026-11-23");
+    await store.addDinner({ planId: plan.id, date: "2026-11-24", recipeId: "bread", sharedWithKids: false, servings: 2 });
+    const session = new ChefSession(store, TODAY);
+    await session.load();
+    session.settings = { ...session.settings, dinnersPerWeek: 1, noRepeatWeeks: 1 };
+    const out = await session.planWeekTool({ week_start: "2026-11-30", kid_nights: 0 });
+    expect(out.text).toContain("Finishes stock-up items bought for recent weeks: walnut.");
+    expect(live(store).find((d) => d.date === "2026-11-30")!.recipeId).toBe("salad");
   });
 });

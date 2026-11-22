@@ -5,12 +5,14 @@ import type { CatalogRecipe } from "./planner";
 export const CHEF_SYSTEM = `You are Chef, the dinner planner inside Common Thyme, an app one household uses to plan weeknight dinners. The household is a couple, and some dinners are also shared with their kids. Both partners talk to you in one shared thread, so each message starts with who wrote it.
 
 What you do:
-- Plan each week's dinners so perishable ingredients carry across nights (buy a bunch of kale once, use it twice) and nothing fresh is left over at the end of the week.
+- Plan each week's dinners so the ingredients worth using up carry across nights (buy a bunch of kale once, use it twice) and nothing is left over at the end of the week.
 - Keep the plan true to life: check in on whether dinners got cooked, reschedule them, or push them to a later week.
 - Add recipes from a link or a photo.
 
 Planning:
-- Weeks run Monday to Sunday. plan_week does the ingredient matching and saves a draft; use it instead of picking recipes yourself, then adjust with change_dinner when they asked for something specific. Say which fresh ingredients the week shares.
+- Weeks run Monday to Sunday. plan_week does the ingredient matching and saves a draft; use it instead of picking recipes yourself, then adjust with change_dinner when they asked for something specific. Say which use-up ingredients the week shares.
+- Ingredients have three tiers. Use up: fresh vegetables and herbs (mushrooms, carrots, kale, spinach, broccoli, scallions), pricey condiments and cheeses (pesto, chili oil, mole, goat cheese, mascarpone, sun-dried tomatoes), and proteins sold in packs for two or more meals (chicken breast, chops, tofu). Planning is built around these. Use over a few weeks: pricey buys that keep for months (walnuts, pecans, pine nuts, golden raisins); planning favors recipes that finish a bag a recent week opened. Fresh cream and half-and-half are use-up, since they spoil within the week. Nice to share: pantry items that keep a while but are still worth finishing (capers, olives, chile pastes, parmesan); they only break ties. Ignore: cheap staples or things always on hand (lemons, limes, garlic, onions, butter, salt and pepper, spices, oil, ketchup, mayo). When you describe a plan, mention the use-up ingredients it shares, and a stock-up item only when the week finishes one from a recent week; don't point out shared lemons or capers.
+- When they say to treat an ingredient differently ("goat cheese should be a use-up", "stop worrying about capers"), call set_ingredient_tier, and also remember it as a tastes note.
 - Kids: the household decides how many dinners each week the kids share. If you don't know for the week you're planning, ask first with the ask tool (for example None, 1, 2, 3, All). plan_week prefers recipes tagged kid friendly for those nights.
 - A missed dinner: move it to the next open night while its fresh ingredients are still good. If the week is full, push it to next week, or suggest which dinner to bump so shared produce still gets used.
 - Only plan recipes from the recipe list. Use refs (r12, d3, n2) in tool calls only; never show refs to people.
@@ -18,7 +20,7 @@ Planning:
 - Don't plan or change dinners nobody asked about. If a request is ambiguous, make the most likely change and say what you did.
 
 Recipes:
-- For a link, call add_recipe_from_link. Pass perishable: the base names of ingredients that spoil within about a week (fresh produce and herbs, dairy, fresh meat and fish), so planning can share them.
+- For a link, call add_recipe_from_link. Pass perishable: the base names of the recipe's use-up and nice-to-share ingredients (see the tiers above), including use-over-a-few-weeks items, so planning can share them. Leave out cheap staples.
 - For a photo of a written recipe (cookbook page, recipe card, screenshot), read it and call save_recipe with every ingredient line and step. If the photo shows the finished dish, set photo to "attached". A photo of a dish with no recipe isn't enough; ask what it is or for the recipe.
 - Add the tag "kid friendly" only when they say so.
 
@@ -36,9 +38,9 @@ Each message from them starts with the household's current state in <household_s
 /** The household's recipes, one line each. Changes only when recipes do. */
 export function catalogText(catalog: CatalogRecipe[], refFor: (id: string) => string): string {
   const lines = catalog.map((r) =>
-    [refFor(r.id), r.title, r.totalMinutes ? `${r.totalMinutes} min` : "", r.tags.join(", "), r.perishables.join(", ")].join(" | "),
+    [refFor(r.id), r.title, r.totalMinutes ? `${r.totalMinutes} min` : "", r.tags.join(", "), r.useUp.join(", "), (r.stockUp ?? []).join(", "), (r.pantry ?? []).join(", ")].join(" | "),
   );
-  return `Recipes in this household (ref | title | time | tags | perishable ingredients):\n${lines.join("\n") || "(none yet)"}`;
+  return `Recipes in this household (ref | title | time | tags | use up | use over a few weeks | nice to share):\n${lines.join("\n") || "(none yet)"}`;
 }
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
@@ -54,7 +56,7 @@ export const CHEF_TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "plan_week",
     description:
-      "Picks dinners for a week that share perishable ingredients, and saves them as a draft. Replaces the week's open planned nights; cooked dinners stay. Skips recipes eaten recently.",
+      "Picks dinners for a week that share use-up ingredients, favoring stock-up items recent weeks opened (pantry items only break ties), and saves them as a draft. Replaces the week's open planned nights; cooked dinners stay. Skips recipes eaten recently.",
     input_schema: obj(
       {
         week_start: { type: "string", description: "The Monday of the week, like 2026-11-23" },
@@ -125,7 +127,7 @@ export const CHEF_TOOLS: Anthropic.Beta.BetaTool[] = [
     input_schema: obj(
       {
         url: { type: "string" },
-        perishable: refs("Base names of ingredients that spoil within about a week, like 'kale' or 'chicken thigh'."),
+        perishable: refs("Base names of its use-up and nice-to-share ingredients, like 'kale', 'goat cheese', 'chicken thigh' or 'capers'. Leave out cheap staples like lemon, garlic and onion."),
         tags: refs("Optional tags, lowercase."),
       },
       ["url", "perishable"],
@@ -139,7 +141,7 @@ export const CHEF_TOOLS: Anthropic.Beta.BetaTool[] = [
         title: { type: "string" },
         ingredients: refs("Each ingredient line as written, like '1 tbsp capers, rinsed'."),
         steps: refs("Each step as a sentence or short paragraph."),
-        perishable: refs("Base names of ingredients that spoil within about a week."),
+        perishable: refs("Base names of its use-up and nice-to-share ingredients. Leave out cheap staples like lemon, garlic and onion."),
         minutes: { type: "integer" },
         servings: { type: "integer" },
         tags: refs("Lowercase tags."),
@@ -148,6 +150,18 @@ export const CHEF_TOOLS: Anthropic.Beta.BetaTool[] = [
         notes: { type: "string" },
       },
       ["title", "ingredients", "steps", "perishable", "photo"],
+    ),
+  },
+  {
+    name: "set_ingredient_tier",
+    description:
+      "Changes how much planning cares about sharing an ingredient across nights, for every recipe that uses it. use_up: plan around it within the week. stock_up: pricey but keeps; finish it over a few weeks. pantry: nice to share, only breaks ties. ignore: don't care.",
+    input_schema: obj(
+      {
+        ingredient: { type: "string", description: "The base name, like 'goat cheese' or 'capers'." },
+        tier: { type: "string", enum: ["use_up", "stock_up", "pantry", "ignore"] },
+      },
+      ["ingredient", "tier"],
     ),
   },
   {

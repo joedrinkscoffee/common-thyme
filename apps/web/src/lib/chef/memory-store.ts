@@ -1,4 +1,6 @@
 import type { CatalogRecipe } from "./planner";
+import { sortByTier, type ShareTier } from "./ingredient-tier";
+import { matchKey } from "../ingredient-line";
 import { DEFAULT_SETTINGS, type ChefNote, type ChefStore, type HouseholdSettings, type NewRecipe, type RecipeFacts, type StoredDinner, type StoredPlan } from "./store";
 
 type MemoryRecipe = CatalogRecipe & { servings: number; ingredients: string[]; stepCount: number };
@@ -16,7 +18,7 @@ export class MemoryStore implements ChefStore {
     recipes: (CatalogRecipe & Partial<MemoryRecipe>)[],
     private household: HouseholdSettings = DEFAULT_SETTINGS,
   ) {
-    this.recipes = recipes.map((r) => ({ servings: 2, ingredients: r.perishables, stepCount: 3, ...r }));
+    this.recipes = recipes.map((r) => ({ servings: 2, ingredients: r.useUp, stepCount: 3, ...r }));
   }
 
   private id(prefix: string) {
@@ -28,7 +30,15 @@ export class MemoryStore implements ChefStore {
     return this.household;
   }
   async catalog() {
-    return this.recipes.map(({ id, title, tags, totalMinutes, perishables }) => ({ id, title, tags, totalMinutes, perishables }));
+    return this.recipes.map(({ id, title, tags, totalMinutes, useUp, pantry, stockUp }) => ({
+      id,
+      title,
+      tags,
+      totalMinutes,
+      useUp: [...useUp],
+      pantry: [...(pantry ?? [])],
+      stockUp: [...(stockUp ?? [])],
+    }));
   }
   async recipe(id: string): Promise<RecipeFacts | null> {
     const r = this.recipes.find((x) => x.id === id);
@@ -42,12 +52,29 @@ export class MemoryStore implements ChefStore {
       title: recipe.title,
       tags: recipe.tags,
       totalMinutes: recipe.totalMinutes,
-      perishables: recipe.perishable.map((p) => p.toLowerCase()),
+      ...sortByTier(recipe.perishable),
       servings: recipe.servings,
       ingredients: recipe.ingredientLines,
       stepCount: recipe.steps.length,
     });
     return { ok: true as const, id, title: recipe.title, photo: !!recipe.photo };
+  }
+
+  async setIngredientTier(name: string, tier: ShareTier) {
+    const key = matchKey(name);
+    let n = 0;
+    for (const r of this.recipes) {
+      const all = [...r.useUp, ...(r.pantry ?? []), ...(r.stockUp ?? []), ...r.ingredients.map((l) => l.toLowerCase())];
+      if (!all.some((x) => matchKey(x) === key || matchKey(x).endsWith(` ${key}`))) continue;
+      n += 1;
+      r.useUp = r.useUp.filter((x) => matchKey(x) !== key);
+      r.pantry = (r.pantry ?? []).filter((x) => matchKey(x) !== key);
+      r.stockUp = (r.stockUp ?? []).filter((x) => matchKey(x) !== key);
+      if (tier === "use_up") r.useUp.push(name.toLowerCase());
+      if (tier === "pantry") r.pantry.push(name.toLowerCase());
+      if (tier === "stock_up") r.stockUp.push(name.toLowerCase());
+    }
+    return n;
   }
 
   async plans(from: string, to: string) {
