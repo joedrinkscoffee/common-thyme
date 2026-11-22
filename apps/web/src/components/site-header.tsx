@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { Suspense } from "react";
-import { getViewer } from "@/lib/household";
+import { supabaseEnv } from "@/lib/supabase/env";
 
-async function SignOut() {
-  const viewer = await getViewer();
-  if (viewer.kind !== "signed-in") return null;
+/**
+ * Part of the static header, so it is there on first paint and the nav never
+ * shifts. Every page that shows this header already sends signed-out visitors
+ * to /login, so only the sample week (no Supabase configured) needs to hide it.
+ */
+function SignOut() {
+  if (!supabaseEnv()) return null;
   return (
     <form action="/auth/sign-out" method="post">
       <button type="submit" className="rounded-full px-3.5 py-2 text-muted hover:text-ink">
@@ -33,9 +36,7 @@ export function SiteHeader({ active = "chef" }: { active?: "chef" | "recipes" | 
         <Link href="/what-chef-knows" className={active === "knows" ? ON : OFF} aria-current={active === "knows" ? "page" : undefined}>
           What Chef knows
         </Link>
-        <Suspense fallback={null}>
-          <SignOut />
-        </Suspense>
+        <SignOut />
       </nav>
     </header>
   );

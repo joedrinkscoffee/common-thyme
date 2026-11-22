@@ -5,8 +5,8 @@ import { notFound, redirect } from "next/navigation";
 import { RecipePhotoButton } from "@/components/recipe-photo-button";
 import { SiteHeader } from "@/components/site-header";
 import { getViewer } from "@/lib/household";
-import { formatAmount } from "@/lib/ingredient-line";
-import { countUpcomingDinners, getRecipe, listIngredientNames, listTags, type RecipeDetail, type RecipeLine } from "@/lib/recipes";
+import { IngredientText } from "@/components/ingredient-text";
+import { countUpcomingDinners, getRecipe, listIngredientNames, listTags, type RecipeDetail } from "@/lib/recipes";
 import { RecipeEditable } from "@/components/recipe-editable";
 import { RebuiltStepsNotice } from "@/components/rebuilt-steps-notice";
 import { checkSourcePage } from "@/lib/source-page";
@@ -21,25 +21,6 @@ function hostOf(url: string): string {
   } catch {
     return url;
   }
-}
-
-/** "1 1/2 tbsp capers" in ink, then the prep ("rinsed") lighter, the same way on every recipe. */
-function IngredientText({ line }: { line: RecipeLine }) {
-  if (!line.name) return <span>{line.raw}</span>;
-  const amount = [
-    line.quantity !== null ? formatAmount(line.quantity) : null,
-    line.unit && line.unit !== "each" && line.unit !== "to taste" ? line.unit : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const prep = [line.prep, line.unit === "to taste" ? "to taste" : null].filter(Boolean).join(", ");
-  return (
-    <span>
-      {amount && <span className="font-semibold">{amount} </span>}
-      <span>{line.name}</span>
-      {prep && <span className="text-sm italic text-muted">, {prep}</span>}
-    </span>
-  );
 }
 
 function editable(r: RecipeDetail) {

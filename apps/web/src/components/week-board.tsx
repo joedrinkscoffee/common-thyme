@@ -1,7 +1,7 @@
-import Link from "next/link";
 import type { HomeDinner, HomeWeek } from "@/lib/chef/brief";
 import { dayName, weekStartOf } from "@/lib/chef/dates";
 import { DinnerMark } from "./dinner-mark";
+import { MealPreview, MealPreviewLink } from "./meal-preview";
 
 const TINTS = ["#f0b98a", "#9fcb8a", "#f2cf78", "#bfd48e", "#e7d3b0"];
 
@@ -13,8 +13,8 @@ function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: s
   const markable = weekStartOf(dinner.date) <= weekStartOf(today) && dinner.status !== "moved";
   return (
     <div className="flex flex-col">
-    <Link
-      href={`/recipes/${dinner.recipeId}`}
+    <MealPreviewLink
+      dinner={dinner}
       className="group block overflow-hidden rounded-2xl border-2 border-ink bg-paper text-ink no-underline transition-[translate,box-shadow] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-pop motion-reduce:transition-none"
     >
       <div className={`relative aspect-square ${skipped ? "opacity-45 grayscale" : ""}`} style={{ background: TINTS[i % TINTS.length] }}>
@@ -40,7 +40,7 @@ function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: s
         <div className={`font-display text-sm font-bold leading-tight group-hover:underline ${skipped ? "text-muted line-through" : ""}`}>{dinner.title}</div>
         {skipped && <div className="mt-0.5 text-[12px] text-muted">Skipped</div>}
       </div>
-    </Link>
+    </MealPreviewLink>
     {markable && <DinnerMark dinnerId={dinner.id} status={dinner.status as "planned" | "cooked" | "skipped"} title={dinner.title} sample={sample} />}
     </div>
   );
@@ -72,7 +72,8 @@ export function WeekBoard({ weeks, today, sample = false }: { weeks: HomeWeek[];
           )}
         </section>
       ))}
-      <p className="m-0 text-[13px] text-muted">Tap a dinner for the recipe, or just tell Chef what to change.</p>
+      <p className="m-0 text-[13px] text-muted">Tap a dinner to preview it, or just tell Chef what to change.</p>
+      <MealPreview weeks={weeks} today={today} />
     </aside>
   );
 }
