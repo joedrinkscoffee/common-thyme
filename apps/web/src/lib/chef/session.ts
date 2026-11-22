@@ -8,6 +8,7 @@ import { isKidFriendly, planWeek, type CatalogRecipe } from "./planner";
 import type { ChefNote, ChefStore, HouseholdSettings, NoteCategory, StoredDinner, StoredPlan } from "./store";
 import { fetchRecipePage } from "./fetch-page";
 import { SHARE_TIERS, TIER_LABEL, sortByTier, type ShareTier } from "./ingredient-tier";
+import { rollOver } from "./check-in";
 import { defaultNights, holidaysInWeek, isOpenNight, type Holiday } from "./holidays";
 import { monthOfWeek, seasonText } from "./season";
 import type { CalendarNight } from "./calendar";
@@ -192,9 +193,16 @@ export class ChefSession {
     if (!isIsoDate(weekStart) || weekdayIndex(weekStart) !== 0) return { ok: false, text: "week_start must be a Monday, like 2026-11-23." };
     if (addDays(weekStart, 6) < this.today) return { ok: false, text: "That week is over." };
 
+    // Dinners from the week before that nobody marked roll in first.
+    const rolled = await rollOver(this.store, weekStart, this.today, (id) => this.catalog.find((r) => r.id === id)?.useUp ?? []);
+    for (const t of rolled.carried) this.log(`Carried ${t} into the week of ${shortDate(weekStart)}`);
+    for (const t of rolled.returned) this.log(`Put ${t} back in your recipes`);
+
     const existing = (await this.store.dinners(weekStart, addDays(weekStart, 6))).filter((d) => d.status !== "moved");
-    // Nights already cooked, skipped or behind us aren't open.
-    const taken = new Set(existing.filter((d) => d.status !== "planned" || d.date < this.today).map((d) => d.date));
+    // Nights already cooked, skipped or behind us aren't open, and neither are
+    // dinners pushed here from an earlier week: they go first.
+    const carried = (d: StoredDinner) => d.status === "planned" && d.pushCount > 0;
+    const taken = new Set(existing.filter((d) => d.status !== "planned" || d.date < this.today || carried(d)).map((d) => d.date));
 
     let nights: string[];
     if (Array.isArray(input.nights) && input.nights.length) {
@@ -208,9 +216,12 @@ export class ChefSession {
       nights = defaultNights(weekStart, this.settings.dinnersPerWeek).filter((d) => !away.has(d));
     }
     nights = nights.filter((d) => d >= this.today && !taken.has(d));
-    if (!nights.length) return { ok: false, text: "No open nights left in that week." };
+    if (!nights.length) {
+      if (rolled.carried.length) return { ok: true, text: `Carried over from last week, which fills the open nights: ${rolled.carried.join(", ")}.` };
+      return { ok: false, text: "No open nights left in that week." };
+    }
     // Planned dinners on those nights get replaced; every other dinner in the week stays.
-    const replaced = existing.filter((d) => d.status === "planned" && nights.includes(d.date));
+    const replaced = existing.filter((d) => d.status === "planned" && !carried(d) && nights.includes(d.date));
     const staying = existing.filter((d) => !replaced.includes(d));
 
     const kidDefault = existing.filter((d) => d.sharedWithKids && d.status === "planned").length;
@@ -262,6 +273,7 @@ export class ChefSession {
     const plan = await this.store.ensurePlan(weekStart);
     if (plan.status === "approved") await this.store.setPlanStatus(plan.id, "draft");
     const out: string[] = [];
+    for (const d of existing.filter(carried)) out.push(`${this.describeDinner(d)} (carried over, not cooked last week)`);
     for (const n of result.nights) {
       const d = await this.store.addDinner({ planId: plan.id, date: n.date, recipeId: n.recipeId, sharedWithKids: n.sharedWithKids, servings: this.servings(n.sharedWithKids) });
       out.push(this.describeDinner(d));
@@ -279,6 +291,7 @@ export class ChefSession {
       text: [
         `Saved as a draft for the week of ${weekStart}:`,
         ...out,
+        rolled.returned.length ? `Pushed twice already, so put back in the recipe library: ${rolled.returned.join(", ")}.` : "",
         `Use-up ingredients shared across nights: ${shared}.`,
         `Use-up ingredients used only once: ${result.singles.join(", ") || "none"}.`,
         `Pantry items shared (only mention if asked): ${result.pantryShared.map((s) => `${s.name} ×${s.nights}`).join(", ") || "none"}.`,
@@ -348,7 +361,8 @@ export class ChefSession {
     }
     const moveOne = async (from: StoredDinner, date: string) => {
       const plan = await this.planFor(date);
-      const added = await this.store.addDinner({ planId: plan.id, date, recipeId: from.recipeId, sharedWithKids: from.sharedWithKids, servings: from.servings });
+      const pushed = weekStartOf(date) > weekStartOf(from.date);
+      const added = await this.store.addDinner({ planId: plan.id, date, recipeId: from.recipeId, sharedWithKids: from.sharedWithKids, servings: from.servings, pushCount: from.pushCount + (pushed ? 1 : 0) });
       await this.store.updateDinner(from.id, { status: "moved", movedTo: added.id });
       return added;
     };

@@ -28,7 +28,7 @@ type MessageRow = {
   role: "chef" | "user";
   author_id: string | null;
   body: string;
-  payload: { choice?: Choice; changes?: string[] } | null;
+  payload: { choice?: Choice; changes?: string[]; undo?: string } | null;
   created_at: string;
 };
 
@@ -56,6 +56,7 @@ export async function loadMessages(db: SupabaseClient, householdId: string, opts
     body: r.body,
     choice: r.payload?.choice ?? null,
     changes: r.payload?.changes ?? [],
+    undo: r.payload?.undo ?? null,
     at: r.created_at,
   }));
 }

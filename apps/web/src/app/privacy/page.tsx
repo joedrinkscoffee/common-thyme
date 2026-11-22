@@ -24,8 +24,10 @@ export default function PrivacyPage() {
       <p>
         Your data is used only to plan your dinners. Chef sends your recipes, plans and notes to Anthropic&apos;s
         Claude API to draft and adjust your week. With a linked calendar, that includes the titles and times of
-        evening events and trips in the weeks being planned, nothing else from your calendar. We don&apos;t sell your data, show ads, or share it with anyone
-        else.
+        evening events and trips in the weeks being planned, nothing else from your calendar. Check-in emails
+        (Thursday evening and Sunday morning, only when meals are still unmarked) are sent through Resend, which
+        receives your email address and the meal names. We don&apos;t sell your data, show ads, or share it with
+        anyone else.
       </p>
 
       <h2 className="mt-8 font-display text-xl font-extrabold">Who can see it</h2>
