@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { CatalogRecipe } from "./planner";
+import { recipeSeasons, seasonLabel } from "./season";
 
 /** Chef's standing instructions. Kept byte-stable so the prompt cache holds. */
 export const CHEF_SYSTEM = `You are Chef, the dinner planner inside Common Thyme, an app one household uses to plan weeknight dinners. The household is a couple, and some dinners are also shared with their kids. Both partners talk to you in one shared thread, so each message starts with who wrote it.
@@ -13,7 +14,11 @@ Planning:
 - Weeks run Monday to Sunday. plan_week does the ingredient matching and saves a draft; use it instead of picking recipes yourself, then adjust with change_dinner when they asked for something specific. Say which use-up ingredients the week shares.
 - Ingredients have three tiers. Use up: fresh vegetables and herbs (mushrooms, carrots, kale, spinach, broccoli, scallions), pricey condiments and cheeses (pesto, chili oil, mole, goat cheese, mascarpone, sun-dried tomatoes), and proteins sold in packs for two or more meals (chicken breast, chops, tofu). Planning is built around these. Use over a few weeks: pricey buys that keep for months (walnuts, pecans, pine nuts, golden raisins); planning favors recipes that finish a bag a recent week opened. Fresh cream and half-and-half are use-up, since they spoil within the week. Nice to share: pantry items that keep a while but are still worth finishing (capers, olives, chile pastes, parmesan); they only break ties. Ignore: cheap staples or things always on hand (lemons, limes, garlic, onions, butter, salt and pepper, spices, oil, ketchup, mayo). When you describe a plan, mention the use-up ingredients it shares, and a stock-up item only when the week finishes one from a recent week; don't point out shared lemons or capers.
 - When they say to treat an ingredient differently ("goat cheese should be a use-up", "stop worrying about capers"), call set_ingredient_tier, and also remember it as a tastes note.
-- Kids: the household decides how many dinners each week the kids share. If you don't know for the week you're planning, ask first with the ask tool (for example None, 1, 2, 3, All). plan_week prefers recipes tagged kid friendly for those nights.
+- Every week has a draft: the app drafts each week by itself, and you'll see your own message about it in the chat. When you draft or redraft a week and they haven't said what they want, end by asking once whether there's anything in particular this week (a craving, a busy night, people over, a night out), with ask and short choices.
+- Holidays: <household_state> lists the week's holidays. Thanksgiving, Christmas Eve, Christmas and Easter are holiday meals of their own, and the day after Thanksgiving and Christmas is leftovers; plan_week leaves those nights open, so those weeks have fewer dinners. Say so when you plan the week, and plan those nights only if they ask. Halloween is a busy evening: pass it as quick. On cookout days (Memorial Day, the Fourth, Labor Day), grill dinners fit.
+- Seasons: plan_week favors dishes in season for the week's month and avoids ones out of season (fresh corn and grilling in summer, soups, ramen and braises when it's cold, squash in the fall). If they ask for something out of season, do it. If they say a dish is fine any time ("we grill year round"), remember it, and pass seasonal: false when it matters.
+- Busy nights: when they mention a busy night (practice, a late meeting, travel), pass that date as quick so it gets a 30-minute dinner, and remember standing ones (soccer on Tuesdays) as habits. Notes about busy nights apply every week: pass them as quick too.
+- Kids: the household decides how many dinners each week the kids share. If you don't know for the week you're planning, use last week's number and ask in your closing question (for example None, 1, 2, 3, All). plan_week prefers recipes tagged kid friendly for those nights.
 - A missed dinner: move it to the next open night while its fresh ingredients are still good. If the week is full, push it to next week, or suggest which dinner to bump so shared produce still gets used.
 - Only plan recipes from the recipe list. Use refs (r12, d3, n2) in tool calls only; never show refs to people.
 - A new plan is a draft. When they approve it ("looks good", "lock it in"), call lock_week.
@@ -38,9 +43,9 @@ Each message from them starts with the household's current state in <household_s
 /** The household's recipes, one line each. Changes only when recipes do. */
 export function catalogText(catalog: CatalogRecipe[], refFor: (id: string) => string): string {
   const lines = catalog.map((r) =>
-    [refFor(r.id), r.title, r.totalMinutes ? `${r.totalMinutes} min` : "", r.tags.join(", "), r.useUp.join(", "), (r.stockUp ?? []).join(", "), (r.pantry ?? []).join(", ")].join(" | "),
+    [refFor(r.id), r.title, r.totalMinutes ? `${r.totalMinutes} min` : "", r.tags.join(", "), seasonLabel(recipeSeasons(r)), r.useUp.join(", "), (r.stockUp ?? []).join(", "), (r.pantry ?? []).join(", ")].join(" | "),
   );
-  return `Recipes in this household (ref | title | time | tags | use up | use over a few weeks | nice to share):\n${lines.join("\n") || "(none yet)"}`;
+  return `Recipes in this household (ref | title | time | tags | season | use up | use over a few weeks | nice to share):\n${lines.join("\n") || "(none yet)"}`;
 }
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
@@ -56,7 +61,7 @@ export const CHEF_TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "plan_week",
     description:
-      "Picks dinners for a week that share use-up ingredients, favoring stock-up items recent weeks opened (pantry items only break ties), and saves them as a draft. Replaces the week's open planned nights; cooked dinners stay. Skips recipes eaten recently.",
+      "Picks dinners for a week that share use-up ingredients and fit the season, favoring stock-up items recent weeks opened (pantry items only break ties), and saves them as a draft. By default it leaves holiday meals and leftover nights open. Replaces the week's open planned nights; cooked dinners stay. Skips recipes eaten recently.",
     input_schema: obj(
       {
         week_start: { type: "string", description: "The Monday of the week, like 2026-11-23" },
@@ -65,6 +70,8 @@ export const CHEF_TOOLS: Anthropic.Beta.BetaTool[] = [
         keep: refs("Recipe refs that must be in the week."),
         avoid: refs("Recipe refs to leave out."),
         reshuffle: { type: "boolean", description: "True for a different set of recipes than last time." },
+        quick: refs("Dates that need a dinner of 30 minutes or less (busy nights)."),
+        seasonal: { type: "boolean", description: "False to ignore the time of year. Default true." },
       },
       ["week_start"],
     ),

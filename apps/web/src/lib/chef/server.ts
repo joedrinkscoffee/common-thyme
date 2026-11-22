@@ -5,6 +5,7 @@ import { addDays, hourIn, todayIn, weekStartOf } from "./dates";
 import { buildHome, type ChefHomeData, type HomeMessage } from "./home";
 import type { Choice } from "./session";
 import { SupabaseChefStore } from "./supabase-store";
+import { ensureDrafts } from "./auto-draft";
 
 export type HouseholdViewer = {
   userId: string;
@@ -90,6 +91,32 @@ export async function signedPhotoUrls(db: SupabaseClient, recipeIds: string[]): 
 /** The Chef home for a signed-in household. */
 export async function loadChefHome(viewer: HouseholdViewer): Promise<ChefHomeData> {
   const { db, store, today, hour } = await chefContext(viewer);
+  // Chef always has a draft: fill an empty week before showing the page.
+  try {
+    const drafts = await ensureDrafts({
+      store,
+      today,
+      hasDrafted: async (weekStart) => {
+        const { data } = await db
+          .from("chef_messages")
+          .select("id")
+          .eq("household_id", viewer.household.id)
+          .eq("payload->>autoDraft", weekStart)
+          .limit(1);
+        return !!data?.length;
+      },
+    });
+    for (const d of drafts) {
+      await saveMessage(db, viewer.household.id, {
+        role: "chef",
+        authorId: null,
+        body: d.body,
+        payload: { autoDraft: d.weekStart, choice: d.choice, changes: d.changes },
+      });
+    }
+  } catch (e) {
+    console.error("chef auto-draft", e);
+  }
   // This week's conversation (from last Monday), up to 30 messages.
   const since = `${addDays(weekStartOf(today), -1)}T00:00:00Z`;
   const messages = await loadMessages(db, viewer.household.id, { since, limit: 30 });
