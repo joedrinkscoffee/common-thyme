@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ChefAvatar } from "./chef-avatar";
 import type { Brief, Segment } from "@/lib/chef/brief";
@@ -9,6 +9,8 @@ import { checkInDinner } from "@/app/chef-actions";
 
 const STICKERS = ["bg-lemon", "bg-caper", "bg-kale"];
 const LONG_EDGE = 1568;
+/** The chat box grows with the text up to this height (about 7 lines), then scrolls. */
+const INPUT_MAX_HEIGHT = 196;
 const NOT_CONNECTED = "I'm not hooked up yet, so I can't act on that. Once the Anthropic key is in, I'll change the week right here.";
 
 type Photo = { data: string; type: string; preview: string };
@@ -98,6 +100,17 @@ export function ChefChat({
   const [answeredCheckIn, setAnsweredCheckIn] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const logEnd = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the chat box to fit what's typed, up to INPUT_MAX_HEIGHT, then scroll inside it.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const height = Math.min(el.scrollHeight + 4, INPUT_MAX_HEIGHT); // + the 2px border on each side
+    el.style.height = `${height}px`;
+    el.style.overflowY = el.scrollHeight + 4 > INPUT_MAX_HEIGHT ? "auto" : "hidden";
+  }, [draft]);
 
   // A refresh (after a check-in or a change) brings the saved conversation from the server.
   const [loaded, setLoaded] = useState(initialMessages);
@@ -193,7 +206,7 @@ export function ChefChat({
             return (
               <div key={m.id} className="flex max-w-[85%] flex-col items-end self-end">
                 {partner && <span className="mb-1 text-xs font-semibold text-muted">{m.author}</span>}
-                <p className="m-0 rounded-[18px] rounded-br-[4px] bg-ink px-4 py-2.5 text-cream">{m.body}</p>
+                <p className="m-0 whitespace-pre-wrap rounded-[18px] rounded-br-[4px] bg-ink px-4 py-2.5 text-cream">{m.body}</p>
               </div>
             );
           }
@@ -296,7 +309,7 @@ export function ChefChat({
           </div>
         )}
         <form
-          className="flex gap-2"
+          className="flex items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void send(draft);
@@ -332,13 +345,24 @@ export function ChefChat({
           <label htmlFor="chef-input" className="sr-only">
             Tell Chef what&apos;s going on
           </label>
-          <input
+          <textarea
+            ref={inputRef}
             id="chef-input"
+            rows={1}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sends; Shift+Enter starts a new line. Leave Enter alone while an IME is composing.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+            enterKeyHint="send"
             placeholder={photo ? "What's this? (optional)" : "Tell Chef what's going on this week…"}
             maxLength={4000}
-            className="min-h-[52px] min-w-0 flex-1 rounded-full border-2 border-ink bg-paper px-5 text-base"
+            style={{ maxHeight: INPUT_MAX_HEIGHT }}
+            className="block min-h-[52px] min-w-0 flex-1 resize-none overflow-y-hidden rounded-[26px] border-2 border-ink bg-paper px-5 py-3 text-base leading-6"
           />
           <button
             type="submit"
