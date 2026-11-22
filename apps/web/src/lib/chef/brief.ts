@@ -4,10 +4,12 @@
  * model, so opening the app costs nothing and is instant.
  */
 import { addDays, dayName, relativeDay, weekDates, weekRangeLabel, weekStartOf, weekdayIndex } from "./dates";
-import type { DinnerStatus, PlanStatus } from "./store";
+import type { DinnerStatus, MealType, PlanStatus } from "./store";
 import { holidayWeekName } from "./holidays";
 
 export type HomeDinner = {
+  /** Breakfast, lunch or dinner. */
+  meal: MealType;
   id: string;
   date: string;
   recipeId: string;
@@ -98,7 +100,7 @@ export function buildBrief(opts: {
   const live = thisWeek.dinners.filter((d) => d.status !== "moved");
   const cooked = live.filter((d) => d.status === "cooked").length;
   const upcoming = live.filter((d) => d.status === "planned" && d.date >= today);
-  const tonight = upcoming.find((d) => d.date === today);
+  const tonight = upcoming.find((d) => d.date === today && d.meal === "dinner");
   const first: Segment[] = [greeting(opts.hour, opts.firstName), " "];
   if (opts.lastWeek && day <= 1 && opts.lastWeek.total > 0) {
     first.push(`Last week you cooked ${opts.lastWeek.cooked} of ${opts.lastWeek.total}. `);

@@ -46,6 +46,11 @@ export async function sampleHome(dayParam?: string): Promise<ChefHomeData> {
     if (n.date < today && n !== pastNights.at(-1)) await store.updateDinner(d.id, { status: "cooked" });
   }
 
+  // A weekend lunch too, to show meals other than dinner.
+  const used = new Set(week.nights.map((n) => n.recipeId));
+  const lunch = catalog.find((r) => !used.has(r.id) && (r.totalMinutes ?? 99) <= 30) ?? catalog.find((r) => !used.has(r.id));
+  if (lunch) await store.addDinner({ planId: plan.id, date: addDays(thisWeek, 5), meal: "lunch", recipeId: lunch.id, sharedWithKids: true, servings: 4 });
+
   const sunday = `${addDays(thisWeek, -1)}T15:00:00Z`;
   const messages: HomeMessage[] = [
     { id: "s1", role: "user", author: "Joe", body: "Plan this week. The kids are with us two nights.", choice: null, changes: [], at: sunday },

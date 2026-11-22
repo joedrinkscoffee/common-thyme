@@ -7,6 +7,14 @@ import type { CatalogRecipe } from "./planner";
 import type { ShareTier } from "./ingredient-tier";
 
 export type DinnerStatus = "planned" | "cooked" | "skipped" | "moved";
+/** Which meal of the day. Most planned meals are dinners. */
+export type MealType = "breakfast" | "lunch" | "dinner";
+export const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner"];
+export const isMealType = (v: unknown): v is MealType => MEAL_TYPES.includes(v as MealType);
+/** Orders meals by day, then breakfast, lunch, dinner. */
+export function byDayAndMeal<T extends { date: string; meal?: MealType }>(a: T, b: T): number {
+  return a.date.localeCompare(b.date) || MEAL_TYPES.indexOf(a.meal ?? "dinner") - MEAL_TYPES.indexOf(b.meal ?? "dinner");
+}
 export type PlanStatus = "draft" | "approved";
 export type NoteCategory = "household" | "tastes" | "habits";
 
@@ -14,6 +22,8 @@ export type StoredDinner = {
   id: string;
   planId: string;
   date: string;
+  /** Breakfast, lunch or dinner. */
+  meal: MealType;
   recipeId: string;
   sharedWithKids: boolean;
   servings: number;
@@ -23,7 +33,7 @@ export type StoredDinner = {
   pushCount: number;
 };
 
-export type NewDinner = Omit<StoredDinner, "id" | "status" | "movedTo" | "pushCount"> & { pushCount?: number };
+export type NewDinner = Omit<StoredDinner, "id" | "status" | "movedTo" | "pushCount" | "meal"> & { pushCount?: number; meal?: MealType };
 export type DinnerPatch = Partial<Pick<StoredDinner, "recipeId" | "sharedWithKids" | "servings" | "status" | "movedTo">>;
 
 export type StoredPlan = { id: string; weekStart: string; status: PlanStatus };

@@ -6,7 +6,8 @@
  * A dinner belongs to one week's plan, so "cooked" counts for that week only.
  */
 import { addDays, dayName, shortDate, weekDates, weekStartOf } from "./dates";
-import type { ChefStore, StoredDinner } from "./store";
+import type { ChefStore, MealType, StoredDinner } from "./store";
+import { holidaysBetween, isOpenNight } from "./holidays";
 
 export type CheckInAction = "cooked" | "later" | "next_week" | "skip";
 export const CHECK_IN_ACTIONS: CheckInAction[] = ["cooked", "later", "next_week", "skip"];
@@ -39,10 +40,14 @@ async function recipeTitle(store: ChefStore, recipeId: string) {
   return (await store.recipe(recipeId))?.title ?? "That meal";
 }
 
-/** The first night from `from` through `to` with no planned or cooked dinner. */
-async function firstOpenNight(store: ChefStore, from: string, to: string): Promise<string | null> {
+/**
+ * The first day from `from` through `to` with no planned or cooked meal of
+ * this type. Dinners also skip holiday meals and leftover nights.
+ */
+async function firstOpenNight(store: ChefStore, from: string, to: string, meal: MealType = "dinner"): Promise<string | null> {
   if (from > to) return null;
-  const taken = new Set((await store.dinners(from, to)).filter(isLive).map((d) => d.date));
+  const taken = new Set((await store.dinners(from, to)).filter((d) => isLive(d) && d.meal === meal).map((d) => d.date));
+  if (meal === "dinner") for (const h of holidaysBetween(from, to)) if (isOpenNight(h)) taken.add(h.date);
   for (let day = from; day <= to; day = addDays(day, 1)) if (!taken.has(day)) return day;
   return null;
 }
@@ -52,6 +57,7 @@ async function moveTo(store: ChefStore, d: StoredDinner, date: string, pushed: b
   const added = await store.addDinner({
     planId: plan.id,
     date,
+    meal: d.meal,
     recipeId: d.recipeId,
     sharedWithKids: d.sharedWithKids,
     servings: d.servings,
@@ -77,7 +83,7 @@ async function push(store: ChefStore, d: StoredDinner, weekStart: string, today:
     };
   }
   const from = weekStart > today ? weekStart : today;
-  const night = await firstOpenNight(store, from, addDays(weekStart, 6));
+  const night = await firstOpenNight(store, from, addDays(weekStart, 6), d.meal);
   if (!night) return { ok: false, error: `The week of ${shortDate(weekStart)} is full. Ask Chef to make room?` };
   await moveTo(store, d, night, true);
   return {
@@ -111,7 +117,7 @@ export async function applyCheckIn(store: ChefStore, dinnerId: string, action: C
     case "later": {
       const weekEnd = addDays(weekStartOf(d.date), 6);
       const from = d.date < today ? today : addDays(d.date, 1);
-      const night = await firstOpenNight(store, from, weekEnd);
+      const night = await firstOpenNight(store, from, weekEnd, d.meal);
       if (!night) return { ok: false, error: `There's no open night left this week for ${title}. Push it to next week instead?` };
       await moveTo(store, d, night, false);
       const when = night === today ? "tonight" : dayName(night);

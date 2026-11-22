@@ -209,3 +209,16 @@ test("a household's calendar link is private to its members", async () => {
   );
   await assert.rejects(as(JOE, `update public.household_calendars set ics_url = 'http://x'`), /check constraint/);
 });
+
+test("planned meals default to dinner and only take breakfast, lunch or dinner", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  const [recipe] = await as(JOE, `insert into public.recipes (household_id, title) values ('${household}', 'Tacos') returning id`);
+  const [plan] = await as(JOE, `insert into public.meal_plans (household_id, week_start) values ('${household}', '2026-11-30') returning id`);
+  const add = (meal) =>
+    as(JOE, `insert into public.planned_dinners (plan_id, household_id, recipe_id, date, servings${meal ? ", meal" : ""})
+      values ('${plan.id}', '${household}', '${recipe.id}', '2026-12-05', 2${meal ? `, '${meal}'` : ""}) returning meal`);
+  assert.equal((await add(null))[0].meal, "dinner");
+  assert.equal((await add("lunch"))[0].meal, "lunch");
+  await assert.rejects(add("brunch"), /check constraint/);
+});

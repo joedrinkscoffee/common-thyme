@@ -1,7 +1,7 @@
 import type { CatalogRecipe } from "./planner";
 import { sortByTier, type ShareTier } from "./ingredient-tier";
 import { matchKey } from "../ingredient-line";
-import { DEFAULT_SETTINGS, type ChefNote, type ChefStore, type HouseholdSettings, type NewRecipe, type RecipeFacts, type StoredDinner, type StoredPlan, type NewDinner, type DinnerPatch } from "./store";
+import { DEFAULT_SETTINGS, byDayAndMeal, type ChefNote, type ChefStore, type HouseholdSettings, type NewRecipe, type RecipeFacts, type StoredDinner, type StoredPlan, type NewDinner, type DinnerPatch } from "./store";
 
 type MemoryRecipe = CatalogRecipe & { servings: number; ingredients: string[]; stepCount: number };
 
@@ -94,13 +94,13 @@ export class MemoryStore implements ChefStore {
   }
 
   async dinners(from: string, to: string) {
-    return this.dinnerList.filter((d) => d.date >= from && d.date <= to).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    return this.dinnerList.filter((d) => d.date >= from && d.date <= to).sort((a, b) => byDayAndMeal(a, b) || a.id.localeCompare(b.id));
   }
   async dinner(id: string) {
     return this.dinnerList.find((d) => d.id === id) ?? null;
   }
   async addDinner(d: NewDinner) {
-    const row: StoredDinner = { ...d, pushCount: d.pushCount ?? 0, id: this.id("dinner"), status: "planned", movedTo: null };
+    const row: StoredDinner = { ...d, meal: d.meal ?? "dinner", pushCount: d.pushCount ?? 0, id: this.id("dinner"), status: "planned", movedTo: null };
     this.dinnerList.push(row);
     return row;
   }

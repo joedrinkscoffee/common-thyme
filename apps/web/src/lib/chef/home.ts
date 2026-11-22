@@ -62,6 +62,7 @@ export async function buildHome(opts: {
         (d): HomeDinner => ({
           id: d.id,
           date: d.date,
+          meal: d.meal,
           recipeId: d.recipeId,
           title: byId.get(d.recipeId)?.title ?? "A deleted recipe",
           photoUrl: photos.get(d.recipeId) ?? null,
