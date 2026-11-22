@@ -5,6 +5,8 @@ import { addDays, hourIn, todayIn, weekStartOf } from "./dates";
 import { buildHome, type ChefHomeData, type HomeMessage } from "./home";
 import type { Choice } from "./session";
 import { SupabaseChefStore } from "./supabase-store";
+import { ensureDrafts } from "./auto-draft";
+import { calendarNights, fetchCalendar, parseEvents, type CalendarNight } from "./calendar";
 
 export type HouseholdViewer = {
   userId: string;
@@ -88,9 +90,67 @@ export async function signedPhotoUrls(db: SupabaseClient, recipeIds: string[]): 
   return out;
 }
 
+export type CalendarLink = { url: string; lastReadAt: string | null; lastError: string | null };
+
+export async function calendarLink(db: SupabaseClient, householdId: string): Promise<CalendarLink | null> {
+  const { data } = await db.from("household_calendars").select("ics_url, last_read_at, last_error").eq("household_id", householdId).maybeSingle();
+  return data ? { url: data.ics_url, lastReadAt: data.last_read_at, lastError: data.last_error } : null;
+}
+
+/**
+ * The nights the household's calendar changes over the next four weeks:
+ * null when no calendar is linked, empty when it couldn't be read.
+ */
+export async function loadCalendarNights(db: SupabaseClient, householdId: string, timeZone: string, today: string): Promise<CalendarNight[] | null> {
+  const link = await calendarLink(db, householdId);
+  if (!link) return null;
+  const got = await fetchCalendar(link.url);
+  let nights: CalendarNight[] = [];
+  let error: string | null = got.ok ? null : got.error;
+  if (got.ok) {
+    try {
+      nights = calendarNights(parseEvents(got.text, today, addDays(weekStartOf(today), 27), timeZone));
+    } catch {
+      error = "Couldn't read that calendar file.";
+    }
+  }
+  await db
+    .from("household_calendars")
+    .update({ last_read_at: new Date().toISOString(), last_error: error })
+    .eq("household_id", householdId);
+  return nights;
+}
+
 /** The Chef home for a signed-in household. */
 export async function loadChefHome(viewer: HouseholdViewer): Promise<ChefHomeData> {
-  const { db, store, today, hour } = await chefContext(viewer);
+  const { db, store, today, hour, settings } = await chefContext(viewer);
+  // Chef always has a draft: fill an empty week before showing the page.
+  try {
+    const drafts = await ensureDrafts({
+      store,
+      today,
+      calendar: () => loadCalendarNights(db, viewer.household.id, settings.timezone, today),
+      hasDrafted: async (weekStart) => {
+        const { data } = await db
+          .from("chef_messages")
+          .select("id")
+          .eq("household_id", viewer.household.id)
+          .eq("payload->>autoDraft", weekStart)
+          .limit(1);
+        return !!data?.length;
+      },
+    });
+    for (const d of drafts) {
+      await saveMessage(db, viewer.household.id, {
+        role: "chef",
+        authorId: null,
+        body: d.body,
+        payload: { autoDraft: d.weekStart, choice: d.choice, changes: d.changes },
+      });
+    }
+  } catch (e) {
+    console.error("chef auto-draft", e);
+  }
   // This week's conversation (from last Monday), up to 30 messages.
   const since = `${addDays(weekStartOf(today), -1)}T00:00:00Z`;
   const messages = await loadMessages(db, viewer.household.id, { since, limit: 30 });

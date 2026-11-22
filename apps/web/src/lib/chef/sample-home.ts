@@ -5,6 +5,7 @@
 import { addDays, hourIn, isIsoDate, todayIn, weekDates, weekStartOf } from "./dates";
 import { buildHome, type ChefHomeData, type HomeMessage } from "./home";
 import { MemoryStore } from "./memory-store";
+import { ensureDrafts } from "./auto-draft";
 import { planWeek, type CatalogRecipe } from "./planner";
 import { sampleRecipes } from "../sample-recipes";
 
@@ -58,6 +59,12 @@ export async function sampleHome(dayParam?: string): Promise<ChefHomeData> {
       at: sunday,
     },
   ];
+
+  // Like the real home: Chef drafts an empty week and says so.
+  const drafts = await ensureDrafts({ store, today, hasDrafted: async () => false });
+  for (const d of drafts) {
+    messages.push({ id: `auto-${d.weekStart}`, role: "chef", author: null, body: d.body, choice: d.choice, changes: d.changes, at: `${today}T15:00:00Z` });
+  }
 
   return buildHome({
     store,

@@ -216,7 +216,7 @@ describe("stock-up items across weeks", () => {
     const session = new ChefSession(store, TODAY);
     await session.load();
     session.settings = { ...session.settings, dinnersPerWeek: 1, noRepeatWeeks: 1 };
-    const out = await session.planWeekTool({ week_start: "2026-11-30", kid_nights: 0 });
+    const out = await session.planWeekTool({ week_start: "2026-11-30", kid_nights: 0, seasonal: false });
     expect(out.text).toContain("Finishes stock-up items bought for recent weeks: walnut.");
     expect(live(store).find((d) => d.date === "2026-11-30")!.recipeId).toBe("salad");
   });
