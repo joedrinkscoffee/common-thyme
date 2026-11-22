@@ -46,3 +46,41 @@
     outline-offset: 2px;
   }
 }
+
+/* Chef page recipe preview: a sheet from the bottom on phones, a panel from the right on wider screens. */
+@keyframes meal-preview-up {
+  from {
+    translate: 0 100%;
+  }
+}
+@keyframes meal-preview-in {
+  from {
+    translate: 100% 0;
+  }
+}
+@keyframes meal-preview-fade {
+  from {
+    opacity: 0;
+  }
+}
+dialog.meal-preview[open] {
+  animation: meal-preview-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (min-width: 40rem) {
+  dialog.meal-preview[open] {
+    animation-name: meal-preview-in;
+  }
+}
+dialog.meal-preview::backdrop {
+  background: rgb(31 26 23 / 0.4);
+  animation: meal-preview-fade 0.2s ease-out;
+}
+html:has(dialog.meal-preview[open]) {
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.meal-preview[open],
+  dialog.meal-preview::backdrop {
+    animation: none;
+  }
+}
