@@ -40,7 +40,7 @@ const USE_UP = [
   "mushroom", "shiitake", "cremini", "portobello", "carrot", "spinach", "kale", "chard", "broccoli", "broccolini", "cauliflower",
   "scallion", "green onion", "leek", "zucchini", "squash", "eggplant", "bell pepper", "sweet pepper", "poblano", "jalapeno", "jalapeño",
   "bok choy", "cabbage", "brussels sprout", "asparagus", "green bean", "snap pea", "snow pea", "pea shoot", "celery", "cucumber",
-  "radish", "fennel", "arugula", "lettuce", "romaine", "mixed green", "spring mix", "corn", "tomato", "avocado", "sweet potato",
+  "radish", "daikon", "fennel", "arugula", "lettuce", "romaine", "mixed green", "spring mix", "corn", "tomato", "avocado", "sweet potato",
   "potato", "beet", "parsnip", "okra", "artichoke", "bean sprout",
   // Fresh herbs
   "basil", "cilantro", "parsley", "dill", "mint", "chive", "thyme", "rosemary", "sage", "tarragon", "lemongrass", "ginger",
