@@ -45,10 +45,10 @@ describe("buildGroceryList", () => {
     const list = buildGroceryList(week);
     const produce = list.sections.find((s) => s.aisle === "produce")!;
     const scallions = produce.items.find((i) => i.key === "scallion")!;
-    expect(scallions.amount).toBe("×8"); // 4 + 2 doubled
+    expect(scallions.amount).toBeNull(); // bought by the bunch
     expect(scallions.uses.map((u) => u.date)).toEqual(["2026-11-30", "2026-12-01"]);
-    const kale = produce.items.find((i) => i.key === "kale" || i.key === "dino kale");
-    expect(kale).toBeTruthy();
+    expect(produce.items.find((i) => i.key === "dino kale")?.amount).toBeNull();
+    expect(produce.items.find((i) => i.key === "shiitake mushroom")?.amount).toBe("8 oz"); // 4 oz doubled
   });
 
   it("groups by aisle in store order and keeps staples apart", () => {

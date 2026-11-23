@@ -23,7 +23,7 @@ describe("grocery_list", () => {
     const { session } = await setup();
     const out = await session.groceryListTool({ week_start: "2026-11-30" });
     expect(out.ok).toBe(true);
-    expect(out.text).toContain("Scallions (×8)"); // 4 + 2 doubled
+    expect(out.text).toMatch(/Scallions(,| \(✓|$)/m); // 4 + 2 doubled
     expect(out.text).toContain("Staples to check at home: Garlic, Olive oil");
     expect(session.groceryWeek).toBe("2026-11-30");
     expect(session.changes).toEqual([]);

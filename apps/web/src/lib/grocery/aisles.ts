@@ -151,3 +151,17 @@ export function defaultAisle(name: string): Aisle {
 export function aisleOf(name: string, override: string | null | undefined): Aisle {
   return isAisle(override) ? override : defaultAisle(name);
 }
+
+// Greens, herbs and scallions: you grab a bunch or a bag, so the list doesn't count them.
+const BY_THE_BUNCH = [
+  "scallion", "green onion", "spring onion", "kale", "dino kale", "lacinato kale", "chard", "swiss chard", "collard", "spinach",
+  "baby spinach", "arugula", "lettuce", "romaine", "spring mix", "mixed green", "watercress", "bok choy",
+  "basil", "cilantro", "parsley", "dill", "mint", "chive", "thyme", "rosemary", "sage", "tarragon", "oregano", "microgreen", "pea shoot",
+];
+
+/** True for greens, herbs and scallions, which need no amount on the list. */
+export function soldByBunch(name: string): boolean {
+  const key = matchKey(name);
+  if (/\b(dried|ground|powder|flake|seed)\b/.test(key)) return false;
+  return has(key, BY_THE_BUNCH);
+}

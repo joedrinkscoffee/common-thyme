@@ -7,7 +7,7 @@
  * Pure: the page and Chef both call it with what the store loaded.
  */
 import { formatAmount, matchKey, parseIngredientLine, type Unit } from "../ingredient-line";
-import { AISLES, AISLE_LABEL, aisleOf, defaultAisle, isAisle, type Aisle } from "./aisles";
+import { AISLES, AISLE_LABEL, aisleOf, defaultAisle, isAisle, soldByBunch, type Aisle } from "./aisles";
 import type { MealType } from "../chef/store";
 
 export type GroceryLine = {
@@ -154,7 +154,7 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
     items.push({
       key: acc.key,
       name: cap(name),
-      amount: shoppingAmount(acc.parts, acc.aisle),
+      amount: soldByBunch(name) ? null : shoppingAmount(acc.parts, acc.aisle),
       aisle: acc.aisle,
       uses: acc.uses.sort((a, b) => a.date.localeCompare(b.date)),
       checked: mark?.checked ?? false,

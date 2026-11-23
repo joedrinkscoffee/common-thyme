@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aisleOf, defaultAisle } from "./aisles";
+import { aisleOf, defaultAisle, soldByBunch } from "./aisles";
 
 describe("defaultAisle", () => {
   it.each([
@@ -33,5 +33,12 @@ describe("defaultAisle", () => {
     expect(aisleOf("garlic", "produce")).toBe("produce");
     expect(aisleOf("garlic", "nonsense")).toBe("staples");
     expect(aisleOf("garlic", null)).toBe("staples");
+  });
+});
+
+describe("soldByBunch", () => {
+  it.each([["scallions", true], ["dino kale", true], ["baby spinach", true], ["cilantro", true], ["fresh thyme", true],
+    ["dried thyme", false], ["ground sage", false], ["carrots", false], ["shiitake mushrooms", false], ["lemon", false]])("%s → %s", (name, want) => {
+    expect(soldByBunch(name)).toBe(want);
   });
 });
