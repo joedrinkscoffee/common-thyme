@@ -21,7 +21,7 @@ export default function LoginPage() {
       <p className="mt-3 leading-relaxed text-muted">
         Chef drafts your week on Sunday. You tweak it, lock it in, and nothing fresh goes to waste.
       </p>
-      <div className="flex-1" />
+      <div className="flex-1 sm:hidden" />
       <div className="mt-8">
         <Suspense fallback={<div className="min-h-[52px]" />}>
           <GoogleSignIn />
