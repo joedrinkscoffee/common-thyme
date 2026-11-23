@@ -149,3 +149,16 @@ html:has(dialog.meal-preview[open]) {
     animation: none;
   }
 }
+
+/* Phone menu: the card drops in under the header, over a light scrim. */
+@keyframes mobile-nav-drop {
+  from {
+    opacity: 0;
+    translate: 0 -0.5rem;
+  }
+}
+@keyframes mobile-nav-fade {
+  from {
+    opacity: 0;
+  }
+}
