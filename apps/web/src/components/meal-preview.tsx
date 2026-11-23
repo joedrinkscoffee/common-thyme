@@ -86,7 +86,9 @@ function hostOf(url: string): string {
 }
 
 function dayLabel(d: HomeDinner, today: string) {
-  return d.date === today && d.status === "planned" ? "Tonight" : dayName(d.date);
+  const meal = d.meal === "dinner" ? "" : ` ${d.meal}`;
+  if (d.date === today && d.status === "planned") return d.meal === "dinner" ? "Tonight" : `Today's${meal}`;
+  return `${dayName(d.date)}${meal}`;
 }
 
 const shortDay = (d: HomeDinner) => dayName(d.date, "short");

@@ -5,6 +5,7 @@ import { sharedFor, sharedWithWeek } from "./shared-with";
 const meal = (id: string, useUp: string[], status: HomeDinner["status"] = "planned"): HomeDinner => ({
   id,
   date: "2026-11-23",
+  meal: "dinner",
   recipeId: id,
   title: id,
   photoUrl: null,

@@ -23,8 +23,11 @@ function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: s
           <img src={dinner.photoUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         )}
         <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${tonight ? "bg-tomato text-white" : "bg-ink text-cream"}`}>
-          {tonight ? "TONIGHT" : dayName(dinner.date, "short").toUpperCase()}
+          {tonight && dinner.meal === "dinner" ? "TONIGHT" : dayName(dinner.date, "short").toUpperCase()}
         </span>
+        {dinner.meal !== "dinner" && (
+          <span className="absolute left-2 top-8 rounded-full border-[1.5px] border-ink bg-cream px-2 py-0.5 text-[11px] font-extrabold">{dinner.meal}</span>
+        )}
         {dinner.sharedWithKids && (
           <span className="absolute right-2 top-2 rotate-3 rounded-full border-[1.5px] border-ink bg-lemon px-2 py-0.5 text-[11px] font-extrabold">
             +kids
@@ -72,7 +75,7 @@ export function WeekBoard({ weeks, today, sample = false }: { weeks: HomeWeek[];
           )}
         </section>
       ))}
-      <p className="m-0 text-[13px] text-muted">Tap a dinner to preview it, or just tell Chef what to change.</p>
+      <p className="m-0 text-[13px] text-muted">Tap a meal to preview it, or just tell Chef what to change.</p>
       <MealPreview weeks={weeks} today={today} />
     </aside>
   );

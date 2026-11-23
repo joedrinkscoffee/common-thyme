@@ -18,6 +18,7 @@ import {
   type DinnerPatch,
   type NewDinner,
   type StoredDinner,
+  byDayAndMeal,
   type StoredPlan,
 } from "./store";
 
@@ -28,6 +29,7 @@ type DinnerRow = {
   id: string;
   plan_id: string;
   date: string;
+  meal: StoredDinner["meal"] | null;
   recipe_id: string;
   shared_with_kids: boolean;
   servings: number;
@@ -35,11 +37,12 @@ type DinnerRow = {
   moved_to: string | null;
   push_count: number;
 };
-const DINNER_COLUMNS = "id, plan_id, date, recipe_id, shared_with_kids, servings, status, moved_to, push_count";
+const DINNER_COLUMNS = "id, plan_id, date, meal, recipe_id, shared_with_kids, servings, status, moved_to, push_count";
 const toDinner = (r: DinnerRow): StoredDinner => ({
   id: r.id,
   planId: r.plan_id,
   date: r.date,
+  meal: r.meal ?? "dinner",
   recipeId: r.recipe_id,
   sharedWithKids: r.shared_with_kids,
   servings: r.servings,
@@ -260,7 +263,7 @@ export class SupabaseChefStore implements ChefStore {
       .order("date")
       .order("created_at");
     if (error) fail("read dinners", error);
-    return ((data ?? []) as DinnerRow[]).map(toDinner);
+    return ((data ?? []) as DinnerRow[]).map(toDinner).sort(byDayAndMeal);
   }
 
   async dinner(id: string): Promise<StoredDinner | null> {
@@ -277,6 +280,7 @@ export class SupabaseChefStore implements ChefStore {
         household_id: this.householdId,
         recipe_id: d.recipeId,
         date: d.date,
+        meal: d.meal ?? "dinner",
         shared_with_kids: d.sharedWithKids,
         servings: d.servings,
         push_count: d.pushCount ?? 0,

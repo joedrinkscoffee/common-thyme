@@ -38,3 +38,11 @@ describe("defaultTier", () => {
     expect(tierOf("kale", true, null)).toBe("use_up");
   });
 });
+
+describe("radishes", () => {
+  it("are a use-up vegetable, daikon too", () => {
+    for (const name of ["radish", "radishes", "watermelon radish", "french breakfast radishes", "daikon", "daikon radish"]) {
+      expect(tierOf(name, false, null)).toBe("use_up");
+    }
+  });
+});

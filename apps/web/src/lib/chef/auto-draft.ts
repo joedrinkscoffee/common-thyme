@@ -94,7 +94,7 @@ export async function ensureDrafts(opts: {
     const lastWeek = dinners.filter((d) => d.date < weekStart && d.status !== "moved");
     const kids = lastWeek.filter((d) => d.sharedWithKids && d.status !== "skipped").length;
     // Only fill empty nights, so carried-over dinners stay where they are.
-    const taken = new Set(dinners.filter((d) => d.date >= weekStart && d.status !== "moved").map((d) => d.date));
+    const taken = new Set(dinners.filter((d) => d.date >= weekStart && d.status !== "moved" && d.meal === "dinner").map((d) => d.date));
     const away = new Set(session.calendarIn(weekStart).filter((c) => c.kind === "away").map((c) => c.date));
     const nights = defaultNights(weekStart, settings.dinnersPerWeek).filter((d) => d >= today && !taken.has(d) && !away.has(d));
     if (!nights.length) continue;
