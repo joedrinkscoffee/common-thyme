@@ -53,3 +53,15 @@ export async function removeGroceryItem(weekStart: string, key: string): Promise
     return failed(e);
   }
 }
+
+export async function setGroceryStatus(weekStart: string, key: string, status: "have" | "need" | null): Promise<GroceryActionResult> {
+  const store = await storeFor(weekStart);
+  if (!store || typeof key !== "string" || !key || key.length > 120) return { ok: false, error: "Sign in first." };
+  if (status !== null && status !== "have" && status !== "need") return { ok: false, error: "That didn't save." };
+  try {
+    await store.setGroceryStatus(weekStart, key, status);
+    return { ok: true };
+  } catch (e) {
+    return failed(e);
+  }
+}

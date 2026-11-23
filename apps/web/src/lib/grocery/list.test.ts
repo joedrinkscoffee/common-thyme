@@ -51,10 +51,11 @@ describe("buildGroceryList", () => {
     expect(produce.items.find((i) => i.key === "shiitake mushroom")?.amount).toBe("8 oz"); // 4 oz doubled
   });
 
-  it("groups by aisle in store order and keeps staples apart", () => {
+  it("groups by aisle in store order and asks about pantry items first", () => {
     const list = buildGroceryList(week);
-    expect(list.sections.map((s) => s.aisle)).toEqual(["produce", "bakery", "cheese", "dairy", "pantry", "international"]);
-    expect(list.staples.map((i) => i.name)).toEqual(["Garlic", "Olive oil", "Salt & pepper"]);
+    expect(list.sections.map((s) => s.aisle)).toEqual(["produce", "bakery", "cheese", "dairy"]);
+    expect(list.pantryCheck.map((i) => i.name)).toEqual(["Garlic", "Kalamata olives", "Olive oil", "Salt & pepper", "White miso"]);
+    expect(list.pantryCheck.map((i) => i.aisle)).toEqual(["produce", "pantry", "pantry", "baking", "international"]);
     expect(list.total).toBe(list.sections.flatMap((s) => s.items).length);
   });
 
@@ -75,7 +76,7 @@ describe("buildGroceryList", () => {
 
   it("keeps canned goods apart from fresh ones, in the pantry aisle", () => {
     const list = buildGroceryList([meal("m1", "2026-11-30", "Shrimp", ["1 can diced tomatoes", "2 tomatoes"])]);
-    expect(list.sections.find((s) => s.aisle === "pantry")?.items.map((i) => [i.name, i.amount])).toEqual([["Canned tomatoes", null]]);
+    expect(list.pantryCheck.map((i) => [i.name, i.aisle, i.amount])).toEqual([["Canned tomatoes", "pantry", null]]);
     expect(list.sections.find((s) => s.aisle === "produce")?.items.map((i) => [i.name, i.amount])).toEqual([["Tomatoes", "×2"]]);
   });
 
@@ -84,13 +85,30 @@ describe("buildGroceryList", () => {
       meal("m1", "2026-11-30", "Stir Fry", ["1 Tbsp Asian-style aromatics", "2 scallions", "plus 1/8 teaspoon salt", "2 pasture-raised eggs", "4 oz cremini mushrooms", "4 oz shiitake mushrooms"]),
       meal("m2", "2026-12-01", "Omelet", ["3 large eggs", "Kosher salt and black pepper", "1/2 lb button mushrooms"]),
     ]);
-    const all = [...list.sections.flatMap((s) => s.items), ...list.staples];
+    const all = [...list.sections.flatMap((s) => s.items), ...list.pantryCheck];
     const names = all.map((i) => i.name).sort();
     expect(names).toEqual(["Eggs", "Garlic", "Ginger", "Mushrooms", "Salt & pepper", "Scallions", "Shiitake mushrooms"]);
     expect(all.find((i) => i.name === "Scallions")?.uses.map((u) => u.title)).toEqual(["Stir Fry"]);
     expect(all.find((i) => i.name === "Salt & pepper")?.amount).toBeNull();
     expect(all.find((i) => i.name === "Eggs")?.uses).toHaveLength(2);
     expect(all.find((i) => i.name === "Mushrooms")?.amount).toBe("12 oz");
+  });
+
+  it("asks about pantry and multi-use items, and moves them on have or need", () => {
+    const m = meal("m1", "2026-11-30", "Fried Rice", ["2 Tbsp soy sauce", "1 cup jasmine rice", "1 Tbsp Calabrian chili paste", "2 eggs", "2 carrots"]);
+    let list = buildGroceryList([m]);
+    expect(list.pantryCheck.map((i) => i.name)).toEqual(["Calabrian chili paste", "Eggs", "Jasmine rice", "Soy sauce"]);
+    expect(list.sections.flatMap((s) => s.items).map((i) => i.name)).toEqual(["Carrots"]);
+    list = buildGroceryList([m], [
+      { key: "soy sauce", label: null, aisle: null, checked: false, status: "have" },
+      { key: "egg", label: null, aisle: null, checked: false, status: "need" },
+      { key: "carrot", label: null, aisle: null, checked: false, status: "have" },
+    ]);
+    expect(list.have.map((i) => i.name)).toEqual(["Carrots", "Soy sauce"]);
+    expect(list.sections.find((s) => s.aisle === "dairy")?.items.map((i) => i.name)).toEqual(["Eggs"]);
+    expect(list.pantryCheck.map((i) => i.name)).toEqual(["Calabrian chili paste", "Jasmine rice"]);
+    expect(list.total).toBe(1);
+    expect(groceryText(list)).toMatch(/Already have \(not shopping for\): Carrots, Soy sauce/);
   });
 
   it("is empty with no meals, and says so", () => {

@@ -9,7 +9,7 @@ import type { CatalogRecipe } from "./planner";
 import { tierOf, type ShareTier } from "./ingredient-tier";
 import { addDays } from "./dates";
 import { normalizeUnit } from "@/lib/ingredient-line";
-import { extraKey, type GroceryLine, type GroceryMark } from "@/lib/grocery/list";
+import { extraKey, type GroceryLine, type GroceryMark, type GroceryStatus } from "@/lib/grocery/list";
 import type { Aisle } from "@/lib/grocery/aisles";
 import {
   DEFAULT_SETTINGS,
@@ -352,12 +352,20 @@ export class SupabaseChefStore implements ChefStore {
       })
       .sort(byDayAndMeal);
 
-    const { data: rows, error } = await this.db
-      .from("grocery_items")
-      .select("item_key, label, aisle, checked_at, checked_by")
-      .eq("household_id", this.householdId)
-      .eq("week_start", weekStart);
-    if (error) return { meals, marks: [], ready: false };
+    type MarkRow = { item_key: string; label: string | null; aisle: string | null; checked_at: string | null; checked_by: string | null; status?: string | null };
+    const readMarks = (withStatus: boolean) =>
+      this.db
+        .from("grocery_items")
+        .select(`item_key, label, aisle, checked_at, checked_by${withStatus ? ", status" : ""}`)
+        .eq("household_id", this.householdId)
+        .eq("week_start", weekStart);
+    let marksRead = await readMarks(true);
+    // Before the "already have it" migration runs there's no status column.
+    const haveReady = !marksRead.error;
+    if (marksRead.error) marksRead = await readMarks(false);
+    const { error } = marksRead;
+    const rows = marksRead.data as MarkRow[] | null;
+    if (error) return { meals, marks: [], ready: false, haveReady: false };
     const people = [...new Set((rows ?? []).map((r) => r.checked_by).filter((x): x is string => !!x))];
     const names = new Map<string, string>();
     if (people.length) {
@@ -370,8 +378,9 @@ export class SupabaseChefStore implements ChefStore {
       aisle: r.aisle,
       checked: !!r.checked_at,
       checkedBy: r.checked_by ? (names.get(r.checked_by) ?? null) : null,
+      status: r.status === "have" || r.status === "need" ? r.status : null,
     }));
-    return { meals, marks, ready: true };
+    return { meals, marks, ready: true, haveReady };
   }
 
   async checkGroceryItem(weekStart: string, key: string, checked: boolean) {
@@ -386,6 +395,14 @@ export class SupabaseChefStore implements ChefStore {
       { onConflict: "household_id,week_start,item_key" },
     );
     if (error) fail("check grocery item", error);
+  }
+
+  async setGroceryStatus(weekStart: string, key: string, status: GroceryStatus | null) {
+    const { error } = await this.db.from("grocery_items").upsert(
+      { household_id: this.householdId, week_start: weekStart, item_key: key.slice(0, 120), status },
+      { onConflict: "household_id,week_start,item_key" },
+    );
+    if (error) fail("mark grocery item", error);
   }
 
   async addGroceryItem(weekStart: string, label: string, aisle: Aisle | null) {
