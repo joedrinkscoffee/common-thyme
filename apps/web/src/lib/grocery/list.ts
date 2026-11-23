@@ -7,6 +7,7 @@
  * Pure: the page and Chef both call it with what the store loaded.
  */
 import { formatAmount, matchKey, parseIngredientLine, type Unit } from "../ingredient-line";
+import { shoppingName, shoppingParts } from "./names";
 import { AISLES, AISLE_LABEL, aisleOf, defaultAisle, isAisle, soldByBunch, type Aisle } from "./aisles";
 import type { MealType } from "../chef/store";
 
@@ -110,12 +111,6 @@ export function extraKey(label: string): string {
   return `extra:${matchKey(label).replace(/ /g, "-").slice(0, 80) || "item"}`;
 }
 
-/** The key two lines share when they're the same thing to buy. */
-export function itemKey(line: GroceryLine): string {
-  const name = line.name ?? parseIngredientLine(line.raw).name ?? line.raw;
-  return matchKey(name) || matchKey(line.raw);
-}
-
 // ------------------------------------------------------------------ the list
 
 export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []): GroceryList {
@@ -125,23 +120,27 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
   for (const m of meals) {
     const use: GroceryUse = { mealId: m.id, date: m.date, meal: m.meal, title: m.title };
     for (const line of m.lines) {
-      // Canned tomatoes aren't fresh tomatoes: a can is its own item, in the pantry aisle.
-      const canned = line.unit === "can" && !/\bcanned\b/i.test(line.name ?? "");
-      const base = itemKey(line);
-      if (!base) continue;
-      const key = canned ? `canned ${base}` : base;
-      const written = (line.name ?? parseIngredientLine(line.raw).name ?? line.raw).toLowerCase();
-      const name = canned ? `canned ${written}` : written;
-      let acc = byKey.get(key);
-      if (!acc) {
-        acc = { key, names: new Map(), parts: [], uses: [], aisle: canned && !isAisle(line.aisle) ? "pantry" : aisleOf(name, line.aisle) };
-        byKey.set(key, acc);
-      } else if (isAisle(line.aisle)) {
-        acc.aisle = line.aisle;
+      const written = line.name ?? parseIngredientLine(line.raw).name ?? line.raw;
+      for (const part of shoppingParts(written, line.quantity, line.unit)) {
+        // Canned tomatoes aren't fresh tomatoes: a can is its own item, in the pantry aisle.
+        const canned = part.unit === "can" && !/\bcanned\b/i.test(part.name);
+        const base = matchKey(part.name);
+        if (!base) continue;
+        const key = canned ? `canned ${base}` : base;
+        const name = canned ? `canned ${part.name}` : part.name;
+        // The household's aisle applies to the line's own ingredient, not to the parts of a combo.
+        const override = part.name === written.toLowerCase() || shoppingName(written) === part.name ? line.aisle : null;
+        let acc = byKey.get(key);
+        if (!acc) {
+          acc = { key, names: new Map(), parts: [], uses: [], aisle: canned && !isAisle(override) ? "pantry" : aisleOf(name, override) };
+          byKey.set(key, acc);
+        } else if (isAisle(override)) {
+          acc.aisle = override;
+        }
+        acc.names.set(name, (acc.names.get(name) ?? 0) + 1);
+        acc.parts.push({ quantity: part.quantity === null ? null : part.quantity * m.scale, unit: part.unit });
+        if (!acc.uses.some((u) => u.mealId === m.id)) acc.uses.push(use);
       }
-      acc.names.set(name, (acc.names.get(name) ?? 0) + 1);
-      acc.parts.push({ quantity: line.quantity === null ? null : line.quantity * m.scale, unit: line.unit });
-      if (!acc.uses.some((u) => u.mealId === m.id)) acc.uses.push(use);
     }
   }
 

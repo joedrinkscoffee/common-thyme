@@ -38,11 +38,11 @@ export const AISLE_LABEL: Record<Aisle, string> = {
   grains: "Pasta, rice & grains",
   international: "International",
   baking: "Baking & spices",
-  nuts: "Nuts & dried fruit",
+  nuts: "Dried fruit",
   frozen: "Frozen",
   drinks: "Wine & drinks",
   other: "Everything else",
-  staples: "Staples you probably have",
+  staples: "Pantry staples you probably have",
 };
 
 /** One emoji per aisle, as a sticker on its heading. */
@@ -56,7 +56,7 @@ export const AISLE_ICON: Record<Aisle, string> = {
   grains: "🍝",
   international: "🥢",
   baking: "🧂",
-  nuts: "🥜",
+  nuts: "🍇",
   frozen: "🧊",
   drinks: "🍷",
   other: "🛒",
@@ -81,6 +81,10 @@ const RULES: [Aisle, string[]][] = [
       "coriander", "ground ginger", "dried basil", "dried parsley", "baking soda", "baking powder", "vanilla extract", "vanilla",
       "cornstarch", "soy sauce", "white vinegar", "red wine vinegar", "apple cider vinegar", "rice vinegar", "balsamic vinegar",
       "sherry vinegar", "vinegar", "hot sauce", "sriracha", "worcestershire", "worcestershire sauce",
+      // Joe keeps these on hand too: sesame, soy sauce of any kind, broth, and nuts.
+      "sesame seed", "black sesame seed", "white sesame seed", "sesame oil", "toasted sesame oil", "tamari", "dark soy sauce", "light soy sauce",
+      "coconut aminos", "broth", "stock", "bouillon", "better than bouillon", "walnut", "pecan", "pine nut", "cashew", "almond", "pistachio",
+      "hazelnut", "macadamia", "peanut", "pepita", "pumpkin seed", "sunflower seed", "nut",
     ],
   ],
   ["pantry", ["broth", "stock", "bouillon", "canned", "tomato paste", "tomato sauce", "crushed tomato", "diced tomato", "whole peeled tomato", "san marzano", "marinara", "salsa", "sun dried tomato", "sundried tomato", "roasted red pepper", "peppadew", "pickled", "pickle", "caper", "olive", "artichoke heart", "chipotle", "adobo", "black bean", "pinto bean", "kidney bean", "cannellini", "white bean", "chickpea", "garbanzo", "lentil", "refried", "coconut milk", "coconut cream", "pesto", "jam", "preserve", "peanut butter", "almond butter", "tahini", "maple syrup", "agave", "bbq sauce", "barbecue sauce", "hot honey", "anchov", "tuna", "chili oil", "chili crisp", "calabrian", "harissa", "mole", "enchilada sauce", "cream of"]],
@@ -131,7 +135,7 @@ function has(key: string, words: string[]): boolean {
 const FIRST: [Aisle, string[]][] = [
   ["produce", ["fresh thyme", "fresh oregano", "fresh ginger", "fresh rosemary", "fresh sage", "fresh basil", "fresh dill", "ginger root", "sugar snap pea", "fresh chive"]],
   ["pantry", ["peanut butter", "almond butter", "chili oil", "chili crisp", "hot honey", "truffle oil"]],
-  ["international", ["sesame oil", "toasted sesame oil", "chili garlic sauce"]],
+  ["international", ["chili garlic sauce"]],
   ["dairy", ["cream cheese", "almond milk", "oat milk", "soy milk"]],
   ["bakery", ["flour tortilla"]],
   ["grains", ["egg noodle"]],
