@@ -1,7 +1,10 @@
 import type { CatalogRecipe } from "./planner";
 import { sortByTier, type ShareTier } from "./ingredient-tier";
-import { matchKey } from "../ingredient-line";
-import { DEFAULT_SETTINGS, byDayAndMeal, type ChefNote, type ChefStore, type HouseholdSettings, type NewRecipe, type RecipeFacts, type StoredDinner, type StoredPlan, type NewDinner, type DinnerPatch } from "./store";
+import { matchKey, parseIngredientLine } from "../ingredient-line";
+import { extraKey, type GroceryMark } from "../grocery/list";
+import type { Aisle } from "../grocery/aisles";
+import { addDays } from "./dates";
+import { DEFAULT_SETTINGS, byDayAndMeal, type ChefNote, type ChefStore, type HouseholdSettings, type NewRecipe, type RecipeFacts, type StoredDinner, type StoredPlan, type NewDinner, type DinnerPatch, type GroceryWeek } from "./store";
 
 type MemoryRecipe = CatalogRecipe & { servings: number; ingredients: string[]; stepCount: number };
 
@@ -11,6 +14,8 @@ export class MemoryStore implements ChefStore {
   plansList: StoredPlan[] = [];
   dinnerList: StoredDinner[] = [];
   noteList: ChefNote[] = [];
+  groceryMarks = new Map<string, GroceryMark[]>(); // week -> marks
+  aisles = new Map<string, Aisle>(); // ingredient match key -> aisle
   created: NewRecipe[] = [];
   private n = 0;
 
@@ -110,6 +115,56 @@ export class MemoryStore implements ChefStore {
   }
   async deleteDinner(id: string) {
     this.dinnerList = this.dinnerList.filter((d) => d.id !== id);
+  }
+
+  async groceryWeek(weekStart: string): Promise<GroceryWeek> {
+    const meals = (await this.dinners(weekStart, addDays(weekStart, 6)))
+      .filter((d) => d.status === "planned" || d.status === "cooked")
+      .map((d) => {
+        const r = this.recipes.find((x) => x.id === d.recipeId);
+        return {
+          id: d.id,
+          date: d.date,
+          meal: d.meal,
+          title: r?.title ?? "a deleted recipe",
+          scale: d.servings / (r?.servings || 2),
+          lines: (r?.ingredients ?? []).map((raw) => {
+            const p = parseIngredientLine(raw);
+            return { raw, name: p.name, quantity: p.quantity, unit: p.unit, aisle: p.name ? (this.aisles.get(matchKey(p.name)) ?? null) : null };
+          }),
+        };
+      });
+    return { meals, marks: [...(this.groceryMarks.get(weekStart) ?? [])], ready: true };
+  }
+  private marksFor(weekStart: string) {
+    let m = this.groceryMarks.get(weekStart);
+    if (!m) this.groceryMarks.set(weekStart, (m = []));
+    return m;
+  }
+  async checkGroceryItem(weekStart: string, key: string, checked: boolean) {
+    const marks = this.marksFor(weekStart);
+    const m = marks.find((x) => x.key === key);
+    if (m) m.checked = checked;
+    else marks.push({ key, label: null, aisle: null, checked });
+  }
+  async addGroceryItem(weekStart: string, label: string, aisle: Aisle | null) {
+    const key = extraKey(label);
+    const marks = this.marksFor(weekStart);
+    const m = marks.find((x) => x.key === key);
+    if (m) Object.assign(m, { label, aisle, checked: false });
+    else marks.push({ key, label, aisle, checked: false });
+    return key;
+  }
+  async removeGroceryItem(weekStart: string, key: string) {
+    this.groceryMarks.set(weekStart, this.marksFor(weekStart).filter((m) => m.key !== key));
+  }
+  async setIngredientAisle(name: string, aisle: Aisle | null) {
+    const key = matchKey(name);
+    const used = this.recipes.some((r) => r.ingredients.some((l) => matchKey(parseIngredientLine(l).name ?? "") === key));
+    if (!used) return 0;
+    if (aisle) this.aisles.set(key, aisle);
+    else this.aisles.delete(key);
+    return 1;
   }
 
   async notes() {

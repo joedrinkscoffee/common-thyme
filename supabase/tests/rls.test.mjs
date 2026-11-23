@@ -222,3 +222,22 @@ test("planned meals default to dinner and only take breakfast, lunch or dinner",
   assert.equal((await add("lunch"))[0].meal, "lunch");
   await assert.rejects(add("brunch"), /check constraint/);
 });
+
+test("a household's grocery check marks are shared by its members and private to them", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  await as(JOE, `insert into public.grocery_items (household_id, week_start, item_key, checked_at) values ('${household}', '2026-11-30', 'scallion', now())`);
+  await as(JOE, `insert into public.grocery_items (household_id, week_start, item_key, label) values ('${household}', '2026-11-30', 'extra:paper-towel', 'paper towels')`);
+  await assert.rejects(
+    as(JOE, `insert into public.grocery_items (household_id, week_start, item_key) values ('${household}', '2026-11-30', 'scallion')`),
+    /duplicate key/,
+  );
+  assert.equal((await as(JOE, "select count(*)::int as n from public.grocery_items"))[0].n, 2);
+  assert.equal((await as(STRANGER, "select count(*)::int as n from public.grocery_items"))[0].n, 0);
+  await assert.rejects(
+    as(STRANGER, `insert into public.grocery_items (household_id, week_start, item_key) values ('${household}', '2026-11-30', 'x')`),
+    /row-level security/,
+  );
+  await as(JOE, `insert into public.ingredients (household_id, name, aisle) values ('${household}', 'garlic', 'produce')`);
+  await assert.rejects(as(JOE, `insert into public.ingredients (household_id, name, aisle) values ('${household}', 'salt', 'aisle 9')`), /check constraint/);
+});

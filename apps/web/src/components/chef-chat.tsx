@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { shortDate } from "@/lib/chef/dates";
 import { ChefAvatar } from "./chef-avatar";
 import type { Brief, Segment } from "@/lib/chef/brief";
 import type { ChefTurnResponse, HomeMessage } from "@/lib/chef/home";
@@ -61,6 +63,27 @@ function ChefText({ text }: { text: string }) {
         </p>
       ))}
     </>
+  );
+}
+
+/** Chef's link to a week's grocery list, under its reply. */
+function GroceryLink({ weekStart }: { weekStart: string }) {
+  return (
+    <Link
+      href={`/groceries?week=${weekStart}`}
+      className="group flex items-center gap-3 rounded-[18px] border-2 border-ink bg-paper py-2.5 pl-3 pr-4 text-ink no-underline transition-[translate,box-shadow,background-color] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-lemon hover:shadow-pop motion-reduce:transition-none"
+    >
+      <span aria-hidden="true" className="flex h-10 w-10 -rotate-6 items-center justify-center rounded-xl border-2 border-ink bg-caper text-xl">
+        🛒
+      </span>
+      <span>
+        <span className="block font-display font-extrabold leading-tight">Grocery list</span>
+        <span className="block text-[13px] text-muted">Week of {shortDate(weekStart)} · by aisle</span>
+      </span>
+      <span aria-hidden="true" className="ml-2 text-lg font-bold transition-transform group-hover:translate-x-0.5">
+        →
+      </span>
+    </Link>
   );
 }
 
@@ -236,6 +259,7 @@ export function ChefChat({
                   )}
                 </div>
               )}
+              {m.grocery && <GroceryLink weekStart={m.grocery} />}
               {m.changes.length > 0 && (
                 <ul aria-label="What Chef changed" className="m-0 flex list-none flex-wrap items-center gap-1.5 p-0">
                   {m.changes.map((c, j) => (

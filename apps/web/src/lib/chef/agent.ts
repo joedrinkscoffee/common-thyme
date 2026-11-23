@@ -22,6 +22,8 @@ export type ChefReply = {
   choice: Choice | null;
   changes: string[];
   addedRecipes: { id: string; title: string }[];
+  /** The week whose grocery list the reply links to. */
+  grocery: string | null;
   usage: { input: number; cacheRead: number; cacheWrite: number; output: number; calls: number };
 };
 
@@ -69,6 +71,10 @@ async function runTool(session: ChefSession, name: string, input: Record<string,
       return session.saveRecipeTool(input);
     case "set_ingredient_tier":
       return session.setIngredientTierTool(input);
+    case "grocery_list":
+      return session.groceryListTool(input);
+    case "set_grocery_aisle":
+      return session.setGroceryAisleTool(input);
     case "ask":
       return session.askTool(input);
     default:
@@ -163,5 +169,5 @@ export async function runChef(opts: {
   }
 
   const text = said.join("\n\n") || (session.choice ? "" : session.changes.length ? "Done." : "Sorry, I lost my train of thought. Try that again?");
-  return { text, choice: session.choice, changes: session.changes, addedRecipes: session.addedRecipes, usage };
+  return { text, choice: session.choice, changes: session.changes, addedRecipes: session.addedRecipes, grocery: session.groceryWeek, usage };
 }

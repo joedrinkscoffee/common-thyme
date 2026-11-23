@@ -61,6 +61,7 @@ export async function sampleHome(dayParam?: string): Promise<ChefHomeData> {
       body: `Done. Five dinners built around **${week.shared[0]?.name ?? "lemon"}** and **${week.shared[1]?.name ?? "kale"}**, and the two kid nights are ones they'll eat.`,
       choice: null,
       changes: ["Drafted the week", "Locked it in"],
+      grocery: thisWeek,
       at: sunday,
     },
   ];

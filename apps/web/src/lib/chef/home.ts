@@ -16,6 +16,8 @@ export type HomeMessage = {
   changes: string[];
   /** A check-in answer this message reports, which Undo reverses. */
   undo?: string | null;
+  /** The week whose grocery list this message links to. */
+  grocery?: string | null;
   at: string;
 };
 

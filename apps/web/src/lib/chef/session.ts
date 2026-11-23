@@ -13,6 +13,9 @@ import { rollOver } from "./check-in";
 import { defaultNights, holidaysInWeek, isOpenNight, type Holiday } from "./holidays";
 import { monthOfWeek, seasonText } from "./season";
 import type { CalendarNight } from "./calendar";
+import { AISLES, AISLE_LABEL, defaultAisle, isAisle } from "../grocery/aisles";
+import { buildGroceryList, groceryText } from "../grocery/list";
+import { matchKey } from "../ingredient-line";
 
 export type Attachment = { bytes: Uint8Array; contentType: string };
 export type Choice = { question: string; choices: string[] };
@@ -46,6 +49,8 @@ export class ChefSession {
   choice: Choice | null = null;
   addedRecipes: { id: string; title: string }[] = [];
   lastDraft: DraftSummary | null = null;
+  /** The week whose grocery list Chef's reply links to. */
+  groceryWeek: string | null = null;
   /** Nights the household calendar changes; null when no calendar is linked. */
   calendar: CalendarNight[] | null = null;
 
@@ -447,7 +452,8 @@ export class ChefSession {
     const locked = input.locked !== false;
     await this.store.setPlanStatus(plan.id, locked ? "approved" : "draft");
     this.log(locked ? `Locked in the week of ${shortDate(weekStart)}` : `Reopened the week of ${shortDate(weekStart)}`);
-    return { ok: true, text: locked ? "Locked in." : "Back to draft." };
+    if (locked) this.groceryWeek = weekStart;
+    return { ok: true, text: locked ? "Locked in. Its grocery list is ready and linked under your reply; mention it in a few words." : "Back to draft." };
   }
 
   async recipeDetailsTool(input: Record<string, unknown>): Promise<ToolOutcome> {
@@ -586,6 +592,65 @@ export class ChefSession {
     for (const r of this.catalog) if (!this.recipeRefOf.has(r.id)) this.refRecipe(r.id);
     this.log(`Treating ${name} as ${TIER_LABEL[tier]}`);
     return { ok: true, text: `${name} is now "${TIER_LABEL[tier]}" (${n} ingredient${n === 1 ? "" : "s"} updated).` };
+  }
+
+  async groceryListTool(input: Record<string, unknown>): Promise<ToolOutcome> {
+    const weekStart = input.week_start;
+    if (!isIsoDate(weekStart) || weekdayIndex(weekStart) !== 0) return { ok: false, text: "week_start must be a Monday." };
+    if (addDays(weekStart, 6) < this.today) return { ok: false, text: "That week is over." };
+    const names = (v: unknown) =>
+      (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === "string").map((x) => x.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 80)).filter(Boolean).slice(0, 30);
+    const notes: string[] = [];
+
+    for (const label of names(input.add)) {
+      await this.store.addGroceryItem(weekStart, label, defaultAisle(label));
+      notes.push(`Added ${label}.`);
+    }
+    const toCheck = [...names(input.check).map((n) => [n, true] as const), ...names(input.uncheck).map((n) => [n, false] as const)];
+    if (toCheck.length) {
+      const before = await this.store.groceryWeek(weekStart);
+      const items = (() => {
+        const l = buildGroceryList(before.meals, before.marks);
+        return [...l.sections.flatMap((s) => s.items), ...l.staples];
+      })();
+      for (const [name, checked] of toCheck) {
+        const key = matchKey(name);
+        const item = items.find((i) => i.key === key) ?? items.find((i) => i.key.endsWith(` ${key}`) || i.key.startsWith(`${key} `));
+        if (!item) {
+          notes.push(`"${name}" isn't on the list.`);
+          continue;
+        }
+        await this.store.checkGroceryItem(weekStart, item.key, checked);
+        notes.push(`${checked ? "Checked off" : "Unchecked"} ${item.name.toLowerCase()}.`);
+      }
+    }
+    if (notes.length) this.log(`Updated the grocery list for the week of ${shortDate(weekStart)}`);
+
+    const week = await this.store.groceryWeek(weekStart);
+    const list = buildGroceryList(week.meals, week.marks);
+    this.groceryWeek = weekStart;
+    return {
+      ok: true,
+      text: [
+        ...notes,
+        groceryText(list),
+        week.ready ? "" : "Check marks and added items can't be saved until the grocery update is run in Supabase; say so if they tried.",
+        "The list is linked under your reply, grouped by aisle, and keeps up as meals change. Don't repeat the list; say what's notable in a line (how many items, the big shared buys).",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    };
+  }
+
+  async setGroceryAisleTool(input: Record<string, unknown>): Promise<ToolOutcome> {
+    const name = typeof input.ingredient === "string" ? input.ingredient.trim().toLowerCase().slice(0, 80) : "";
+    if (!name) return { ok: false, text: "ingredient is required." };
+    const aisle = input.aisle === "default" ? null : input.aisle;
+    if (aisle !== null && !isAisle(aisle)) return { ok: false, text: `aisle must be one of ${AISLES.join(", ")}, or default.` };
+    const n = await this.store.setIngredientAisle(name, aisle);
+    if (!n) return { ok: false, text: `No recipe uses "${name}". Check the spelling against recipe_details.` };
+    this.log(aisle ? `Moved ${name} to ${AISLE_LABEL[aisle].toLowerCase()}` : `Put ${name} back in its usual aisle`);
+    return { ok: true, text: `${name} is now under "${aisle ? AISLE_LABEL[aisle] : AISLE_LABEL[defaultAisle(name)]}" on grocery lists.` };
   }
 
   askTool(input: Record<string, unknown>): ToolOutcome {
