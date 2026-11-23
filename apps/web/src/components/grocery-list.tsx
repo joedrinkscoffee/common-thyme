@@ -6,16 +6,15 @@ import { useRouter } from "next/navigation";
 import { addGroceryItem, checkGroceryItem, removeGroceryItem } from "@/app/groceries/actions";
 import { AISLE_ICON, AISLE_LABEL, defaultAisle } from "@/lib/grocery/aisles";
 import { extraKey, type GroceryItem, type GroceryList } from "@/lib/grocery/list";
-import { dayName } from "@/lib/chef/dates";
 
 type Tab = { weekStart: string; label: string; active: boolean; empty: boolean };
 
 /** How often the list picks up the other person's check marks while it's open. */
 const SYNC_MS = 15_000;
 
-function uses(item: GroceryItem): string {
-  if (item.extra) return "Added by hand";
-  return item.uses.map((u) => `${dayName(u.date, "short")}${u.meal !== "dinner" ? ` ${u.meal}` : ""} ${u.title}`).join(" · ");
+/** The recipes an item is for, once each. */
+function recipesFor(item: GroceryItem): string[] {
+  return [...new Set(item.uses.map((u) => u.title))];
 }
 
 function Row({
@@ -52,7 +51,17 @@ function Row({
             <span className="font-semibold">{item.name}</span>
             {item.amount && <span className={`text-[15px] font-bold ${checked ? "" : "text-ink-soft"}`}>{item.amount}</span>}
           </span>
-          <span className="mt-0.5 block truncate text-[13px] text-muted">{uses(item)}</span>
+          {item.extra ? (
+            <span className="mt-0.5 block text-[13px] text-muted">Added by hand</span>
+          ) : (
+            <span className="mt-1 flex flex-wrap gap-1" aria-label="For">
+              {recipesFor(item).map((t) => (
+                <span key={t} className={`max-w-full truncate rounded-full bg-sand px-2 py-0.5 text-[12px] font-semibold ${checked ? "text-muted" : "text-ink-soft"}`}>
+                  {t}
+                </span>
+              ))}
+            </span>
+          )}
         </span>
         {by && (
           <span className="flex-none rotate-2 rounded-full border-[1.5px] border-ink bg-kale px-2 py-0.5 text-[11px] font-extrabold">{by} got it</span>

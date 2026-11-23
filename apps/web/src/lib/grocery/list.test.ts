@@ -54,7 +54,7 @@ describe("buildGroceryList", () => {
   it("groups by aisle in store order and keeps staples apart", () => {
     const list = buildGroceryList(week);
     expect(list.sections.map((s) => s.aisle)).toEqual(["produce", "bakery", "cheese", "dairy", "pantry", "international"]);
-    expect(list.staples.map((i) => i.name)).toEqual(["Garlic", "Olive oil", "Salt"]);
+    expect(list.staples.map((i) => i.name)).toEqual(["Garlic", "Olive oil", "Salt & pepper"]);
     expect(list.total).toBe(list.sections.flatMap((s) => s.items).length);
   });
 
@@ -77,6 +77,20 @@ describe("buildGroceryList", () => {
     const list = buildGroceryList([meal("m1", "2026-11-30", "Shrimp", ["1 can diced tomatoes", "2 tomatoes"])]);
     expect(list.sections.find((s) => s.aisle === "pantry")?.items.map((i) => [i.name, i.amount])).toEqual([["Canned tomatoes", null]]);
     expect(list.sections.find((s) => s.aisle === "produce")?.items.map((i) => [i.name, i.amount])).toEqual([["Tomatoes", "×2"]]);
+  });
+
+  it("shops for simple names, splits aromatics, and doesn't list stray amounts", () => {
+    const list = buildGroceryList([
+      meal("m1", "2026-11-30", "Stir Fry", ["1 Tbsp Asian-style aromatics", "2 scallions", "plus 1/8 teaspoon salt", "2 pasture-raised eggs", "4 oz cremini mushrooms", "4 oz shiitake mushrooms"]),
+      meal("m2", "2026-12-01", "Omelet", ["3 large eggs", "Kosher salt and black pepper", "1/2 lb button mushrooms"]),
+    ]);
+    const all = [...list.sections.flatMap((s) => s.items), ...list.staples];
+    const names = all.map((i) => i.name).sort();
+    expect(names).toEqual(["Eggs", "Garlic", "Ginger", "Mushrooms", "Salt & pepper", "Scallions", "Shiitake mushrooms"]);
+    expect(all.find((i) => i.name === "Scallions")?.uses.map((u) => u.title)).toEqual(["Stir Fry"]);
+    expect(all.find((i) => i.name === "Salt & pepper")?.amount).toBeNull();
+    expect(all.find((i) => i.name === "Eggs")?.uses).toHaveLength(2);
+    expect(all.find((i) => i.name === "Mushrooms")?.amount).toBe("12 oz");
   });
 
   it("is empty with no meals, and says so", () => {

@@ -13,16 +13,19 @@ describe("defaultAisle", () => {
     ["goat cheese", "cheese"], ["parmesan", "cheese"], ["mascarpone", "cheese"], ["prosciutto", "cheese"],
     ["heavy cream", "dairy"], ["half and half", "dairy"], ["cream cheese", "dairy"], ["eggs", "dairy"], ["tofu", "dairy"], ["almond milk", "dairy"],
     // Pantry and international
-    ["chicken stock", "pantry"], ["capers", "pantry"], ["basil pesto", "pantry"], ["sun-dried tomatoes", "pantry"], ["black bean chili oil", "pantry"],
+    ["capers", "pantry"], ["basil pesto", "pantry"], ["sun-dried tomatoes", "pantry"], ["black bean chili oil", "pantry"],
     ["chickpeas", "pantry"], ["coconut milk", "pantry"], ["peanut butter", "pantry"], ["mole", "pantry"],
-    ["fish sauce", "international"], ["sesame oil", "international"], ["white miso", "international"], ["panko", "international"],
+    ["fish sauce", "international"], ["white miso", "international"], ["panko", "international"],
     // Grains, bakery, nuts, frozen, drinks
     ["orzo", "grains"], ["jasmine rice", "grains"], ["egg noodles", "grains"], ["flour tortillas", "bakery"], ["naan", "bakery"],
-    ["walnuts", "nuts"], ["golden raisins", "nuts"], ["pine nuts", "nuts"], ["frozen peas", "frozen"], ["dry white wine", "drinks"],
+    ["golden raisins", "nuts"], ["frozen peas", "frozen"], ["dry white wine", "drinks"],
     // Staples you probably have
     ["kosher salt", "staples"], ["black pepper", "staples"], ["salt and pepper", "staples"], ["olive oil", "staples"], ["butter", "staples"],
     ["garlic", "staples"], ["garlic cloves", "staples"], ["ketchup", "staples"], ["mayo", "staples"], ["ground cumin", "staples"],
     ["garlic powder", "staples"], ["red pepper flakes", "staples"], ["all-purpose flour", "staples"], ["soy sauce", "staples"],
+    // Joe's pantry staples: sesame, soy sauce of any kind, broth, nuts
+    ["sesame seeds", "staples"], ["toasted sesame oil", "staples"], ["tamari", "staples"], ["dark soy sauce", "staples"],
+    ["chicken stock", "staples"], ["vegetable broth", "staples"], ["walnuts", "staples"], ["pine nuts", "staples"], ["salt & pepper", "staples"],
     // Unknown
     ["", "other"], ["mystery thing", "other"],
   ])("%s → %s", (name, aisle) => {
