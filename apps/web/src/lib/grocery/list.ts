@@ -1,14 +1,15 @@
 /**
  * The grocery list for a week, built from its planned meals: every
  * ingredient line, scaled to the servings planned, combined across recipes
- * and grouped by aisle in the order you walk the store. Staples (salt, oil,
- * butter, spices) sit at the end to check before you go.
+ * and grouped by aisle in the order you walk the store. Pantry and
+ * multi-use items (soy sauce, rice, eggs) are asked about first: anything
+ * marked "already have it" drops off the list.
  *
  * Pure: the page and Chef both call it with what the store loaded.
  */
 import { formatAmount, matchKey, parseIngredientLine, type Unit } from "../ingredient-line";
 import { shoppingName, shoppingParts } from "./names";
-import { AISLES, AISLE_LABEL, aisleOf, defaultAisle, isAisle, soldByBunch, type Aisle } from "./aisles";
+import { AISLES, AISLE_LABEL, aisleOf, isAisle, likelyOnHand, shopAisle, soldByBunch, type Aisle } from "./aisles";
 import type { MealType } from "../chef/store";
 
 export type GroceryLine = {
@@ -40,7 +41,11 @@ export type GroceryMark = {
   aisle: string | null;
   checked: boolean;
   checkedBy?: string | null;
+  /** "have": already on hand, skip it. "need": out of it, so shop for it. Null: not said. */
+  status?: GroceryStatus | null;
 };
+
+export type GroceryStatus = "have" | "need";
 
 export type GroceryUse = { mealId: string; date: string; meal: MealType; title: string };
 
@@ -55,15 +60,22 @@ export type GroceryItem = {
   checkedBy: string | null;
   /** Added by hand, not from a recipe. */
   extra: boolean;
+  /** Said to be on hand ("have") or needed ("need"); null until someone says. */
+  status: GroceryStatus | null;
+  /** A pantry or multi-use item you might already have, so the list asks first. */
+  likely: boolean;
 };
 
 export type GrocerySection = { aisle: Aisle; label: string; items: GroceryItem[] };
 
 export type GroceryList = {
+  /** What to buy, by aisle. */
   sections: GrocerySection[];
-  /** Salt, oil, butter and the like: check the pantry first. */
-  staples: GroceryItem[];
-  /** Items to buy (staples aside), and how many are checked off. */
+  /** Pantry and multi-use items nobody has said they have or need yet: "Already have these?" */
+  pantryCheck: GroceryItem[];
+  /** Marked as already on hand: off the shopping list. */
+  have: GroceryItem[];
+  /** Items to buy, and how many are checked off. */
   total: number;
   checked: number;
   meals: number;
@@ -114,7 +126,7 @@ export function extraKey(label: string): string {
 // ------------------------------------------------------------------ the list
 
 export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []): GroceryList {
-  type Acc = { key: string; names: Map<string, number>; parts: { quantity: number | null; unit: Unit | null }[]; uses: GroceryUse[]; aisle: Aisle };
+  type Acc = { key: string; names: Map<string, number>; parts: { quantity: number | null; unit: Unit | null }[]; uses: GroceryUse[]; aisle: Aisle; moved: Aisle | null };
   const byKey = new Map<string, Acc>();
 
   for (const m of meals) {
@@ -132,10 +144,11 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
         const override = part.name === written.toLowerCase() || shoppingName(written) === part.name ? line.aisle : null;
         let acc = byKey.get(key);
         if (!acc) {
-          acc = { key, names: new Map(), parts: [], uses: [], aisle: canned && !isAisle(override) ? "pantry" : aisleOf(name, override) };
+          acc = { key, names: new Map(), parts: [], uses: [], aisle: canned && !isAisle(override) ? "pantry" : aisleOf(name, override), moved: isAisle(override) ? override : null };
           byKey.set(key, acc);
         } else if (isAisle(override)) {
           acc.aisle = override;
+          acc.moved = override;
         }
         acc.names.set(name, (acc.names.get(name) ?? 0) + 1);
         acc.parts.push({ quantity: part.quantity === null ? null : part.quantity * m.scale, unit: part.unit });
@@ -154,7 +167,10 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
       key: acc.key,
       name: cap(name),
       amount: soldByBunch(name) ? null : shoppingAmount(acc.parts, acc.aisle),
-      aisle: acc.aisle,
+      aisle: shopAisle(name, acc.aisle),
+      status: mark?.status ?? null,
+      // The household's own aisle decides when they moved it; otherwise the ingredient does.
+      likely: acc.aisle === "staples" || likelyOnHand(name, acc.moved),
       uses: acc.uses.sort((a, b) => a.date.localeCompare(b.date)),
       checked: mark?.checked ?? false,
       checkedBy: mark?.checked ? (mark.checkedBy ?? null) : null,
@@ -167,7 +183,10 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
       key: mark.key,
       name: cap(mark.label),
       amount: null,
-      aisle: isAisle(mark.aisle) ? mark.aisle : defaultAisle(mark.label),
+      aisle: shopAisle(mark.label, mark.aisle),
+      status: mark.status ?? null,
+      // Added by hand means they want it.
+      likely: false,
       uses: [],
       checked: mark.checked,
       checkedBy: mark.checked ? (mark.checkedBy ?? null) : null,
@@ -176,30 +195,31 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
   }
 
   const byName = (a: GroceryItem, b: GroceryItem) => a.name.localeCompare(b.name);
+  const toBuy = (i: GroceryItem) => i.status === "need" || (i.status === null && !i.likely);
   const sections: GrocerySection[] = [];
   for (const aisle of AISLES) {
-    if (aisle === "staples") continue;
-    const here = items.filter((i) => i.aisle === aisle).sort(byName);
+    const here = items.filter((i) => i.aisle === aisle && toBuy(i)).sort(byName);
     if (here.length) sections.push({ aisle, label: AISLE_LABEL[aisle], items: here });
   }
-  const staples = items.filter((i) => i.aisle === "staples").sort(byName);
-  const toBuy = sections.flatMap((s) => s.items);
+  const buying = sections.flatMap((s) => s.items);
   return {
     sections,
-    staples,
-    total: toBuy.length,
-    checked: toBuy.filter((i) => i.checked).length,
+    pantryCheck: items.filter((i) => i.status === null && i.likely).sort(byName),
+    have: items.filter((i) => i.status === "have").sort(byName),
+    total: buying.length,
+    checked: buying.filter((i) => i.checked).length,
     meals: meals.length,
   };
 }
 
 /** The list as a few lines of text, for Chef. */
 export function groceryText(list: GroceryList): string {
-  if (!list.total && !list.staples.length) return "The list is empty: no meals planned that week yet.";
+  if (!list.total && !list.pantryCheck.length && !list.have.length) return "The list is empty: no meals planned that week yet.";
   const lines = [`${list.total} items to buy for ${list.meals} meals (${list.checked} checked off).`];
   for (const s of list.sections) {
     lines.push(`${s.label}: ${s.items.map((i) => `${i.name}${i.amount ? ` (${i.amount})` : ""}${i.checked ? " ✓" : ""}`).join(", ")}`);
   }
-  if (list.staples.length) lines.push(`Staples to check at home: ${list.staples.map((i) => i.name).join(", ")}`);
+  if (list.pantryCheck.length) lines.push(`Not yet asked whether they have these on hand: ${list.pantryCheck.map((i) => i.name).join(", ")}`);
+  if (list.have.length) lines.push(`Already have (not shopping for): ${list.have.map((i) => i.name).join(", ")}`);
   return lines.join("\n");
 }

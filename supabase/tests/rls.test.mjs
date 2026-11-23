@@ -241,3 +241,13 @@ test("a household's grocery check marks are shared by its members and private to
   await as(JOE, `insert into public.ingredients (household_id, name, aisle) values ('${household}', 'garlic', 'produce')`);
   await assert.rejects(as(JOE, `insert into public.ingredients (household_id, name, aisle) values ('${household}', 'salt', 'aisle 9')`), /check constraint/);
 });
+
+test("grocery items can be marked as on hand or needed", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  await as(JOE, `insert into public.grocery_items (household_id, week_start, item_key, status) values ('${household}', '2026-11-30', 'soy sauce', 'have')`);
+  await as(JOE, `insert into public.grocery_items (household_id, week_start, item_key) values ('${household}', '2026-11-30', 'jasmine rice')`);
+  const rows = await as(JOE, "select item_key, status from public.grocery_items order by item_key");
+  assert.deepEqual(rows, [{ item_key: "jasmine rice", status: null }, { item_key: "soy sauce", status: "have" }]);
+  await assert.rejects(as(JOE, `update public.grocery_items set status = 'maybe'`), /check constraint/);
+});

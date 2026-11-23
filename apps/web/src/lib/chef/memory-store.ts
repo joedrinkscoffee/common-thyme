@@ -1,7 +1,7 @@
 import type { CatalogRecipe } from "./planner";
 import { sortByTier, type ShareTier } from "./ingredient-tier";
 import { matchKey, parseIngredientLine } from "../ingredient-line";
-import { extraKey, type GroceryMark } from "../grocery/list";
+import { extraKey, type GroceryMark, type GroceryStatus } from "../grocery/list";
 import type { Aisle } from "../grocery/aisles";
 import { addDays } from "./dates";
 import { DEFAULT_SETTINGS, byDayAndMeal, type ChefNote, type ChefStore, type HouseholdSettings, type NewRecipe, type RecipeFacts, type StoredDinner, type StoredPlan, type NewDinner, type DinnerPatch, type GroceryWeek } from "./store";
@@ -134,7 +134,7 @@ export class MemoryStore implements ChefStore {
           }),
         };
       });
-    return { meals, marks: [...(this.groceryMarks.get(weekStart) ?? [])], ready: true };
+    return { meals, marks: [...(this.groceryMarks.get(weekStart) ?? [])], ready: true, haveReady: true };
   }
   private marksFor(weekStart: string) {
     let m = this.groceryMarks.get(weekStart);
@@ -146,6 +146,12 @@ export class MemoryStore implements ChefStore {
     const m = marks.find((x) => x.key === key);
     if (m) m.checked = checked;
     else marks.push({ key, label: null, aisle: null, checked });
+  }
+  async setGroceryStatus(weekStart: string, key: string, status: GroceryStatus | null) {
+    const marks = this.marksFor(weekStart);
+    const m = marks.find((x) => x.key === key);
+    if (m) m.status = status;
+    else marks.push({ key, label: null, aisle: null, checked: false, status });
   }
   async addGroceryItem(weekStart: string, label: string, aisle: Aisle | null) {
     const key = extraKey(label);

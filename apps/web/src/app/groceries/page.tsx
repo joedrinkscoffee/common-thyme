@@ -53,6 +53,7 @@ async function Groceries({ searchParams }: { searchParams: Promise<{ week?: stri
       ]}
       list={list}
       ready={data.ready}
+      haveReady={data.haveReady}
       firstName={firstName}
       sample={viewer.kind === "sample"}
     />

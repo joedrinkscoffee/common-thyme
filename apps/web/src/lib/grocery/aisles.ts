@@ -169,3 +169,35 @@ export function soldByBunch(name: string): boolean {
   if (/\b(dried|ground|powder|flake|seed)\b/.test(key)) return false;
   return has(key, BY_THE_BUNCH);
 }
+
+// Where to find a staple when you do need to buy it.
+const STAPLE_HOME: [Aisle, string[]][] = [
+  ["produce", ["garlic", "garlic clove"]],
+  ["dairy", ["butter", "unsalted butter", "salted butter"]],
+  ["nuts", ["walnut", "pecan", "pine nut", "cashew", "almond", "pistachio", "hazelnut", "macadamia", "peanut", "pepita", "pumpkin seed", "sunflower seed", "nut"]],
+  ["international", ["sesame oil", "toasted sesame oil", "tamari", "coconut aminos", "soy sauce", "dark soy sauce", "light soy sauce"]],
+  ["pantry", ["oil", "vinegar", "ketchup", "mayonnaise", "mayo", "mustard", "hot sauce", "sriracha", "worcestershire", "broth", "stock", "bouillon", "honey"]],
+];
+
+/** The aisle to shop in, never "staples": a staple you're out of still lives somewhere in the store. */
+export function shopAisle(name: string, override?: string | null): Aisle {
+  if (isAisle(override) && override !== "staples") return override;
+  const guess = defaultAisle(name);
+  if (guess !== "staples") return guess;
+  const key = matchKey(name);
+  for (const [aisle, words] of STAPLE_HOME) if (has(key, words)) return aisle;
+  return "baking"; // salt, pepper, spices, flour, sugar, sesame seeds
+}
+
+// Things that keep and get used across many meals, so you likely have some: worth asking before you shop.
+const MULTI_USE = ["egg", "parmesan", "parmigiano", "pecorino", "romano", "grana padano", "cheddar"];
+const ON_HAND_AISLES: Aisle[] = ["staples", "pantry", "international", "baking", "grains", "nuts"];
+
+/** True for pantry and multi-use items you might already have: soy sauce, jasmine rice, chili paste, eggs. */
+export function likelyOnHand(name: string, override?: string | null): boolean {
+  if (override === "staples") return true;
+  if (isAisle(override)) return ON_HAND_AISLES.includes(override);
+  const key = matchKey(name);
+  if (/^canned /.test(key)) return true;
+  return ON_HAND_AISLES.includes(defaultAisle(name)) || has(key, MULTI_USE);
+}

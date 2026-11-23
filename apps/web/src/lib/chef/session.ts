@@ -607,21 +607,36 @@ export class ChefSession {
       notes.push(`Added ${label}.`);
     }
     const toCheck = [...names(input.check).map((n) => [n, true] as const), ...names(input.uncheck).map((n) => [n, false] as const)];
-    if (toCheck.length) {
+    const toMark = [...names(input.have).map((n) => [n, "have"] as const), ...names(input.need).map((n) => [n, "need"] as const)];
+    if (toCheck.length || toMark.length) {
       const before = await this.store.groceryWeek(weekStart);
-      const items = (() => {
-        const l = buildGroceryList(before.meals, before.marks);
-        return [...l.sections.flatMap((s) => s.items), ...l.staples];
-      })();
-      for (const [name, checked] of toCheck) {
+      const l = buildGroceryList(before.meals, before.marks);
+      const items = [...l.sections.flatMap((s) => s.items), ...l.pantryCheck, ...l.have];
+      const find = (name: string) => {
         const key = matchKey(name);
-        const item = items.find((i) => i.key === key) ?? items.find((i) => i.key.endsWith(` ${key}`) || i.key.startsWith(`${key} `));
+        return items.find((i) => i.key === key) ?? items.find((i) => i.key.endsWith(` ${key}`) || i.key.startsWith(`${key} `));
+      };
+      for (const [name, checked] of toCheck) {
+        const item = find(name);
         if (!item) {
           notes.push(`"${name}" isn't on the list.`);
           continue;
         }
         await this.store.checkGroceryItem(weekStart, item.key, checked);
         notes.push(`${checked ? "Checked off" : "Unchecked"} ${item.name.toLowerCase()}.`);
+      }
+      for (const [name, status] of toMark) {
+        const item = find(name);
+        if (!item) {
+          notes.push(`"${name}" isn't on the list.`);
+          continue;
+        }
+        if (!before.haveReady) {
+          notes.push(`Couldn't mark ${item.name.toLowerCase()}: "already have it" needs the latest grocery update run in Supabase.`);
+          continue;
+        }
+        await this.store.setGroceryStatus(weekStart, item.key, status);
+        notes.push(status === "have" ? `Marked ${item.name.toLowerCase()} as already on hand.` : `Put ${item.name.toLowerCase()} on the list to buy.`);
       }
     }
     if (notes.length) this.log(`Updated the grocery list for the week of ${shortDate(weekStart)}`);

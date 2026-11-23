@@ -6,7 +6,7 @@
 import type { CatalogRecipe } from "./planner";
 import type { ShareTier } from "./ingredient-tier";
 import type { Aisle } from "../grocery/aisles";
-import type { GroceryMark, GroceryMeal } from "../grocery/list";
+import type { GroceryMark, GroceryMeal, GroceryStatus } from "../grocery/list";
 
 export type DinnerStatus = "planned" | "cooked" | "skipped" | "moved";
 /** Which meal of the day. Most planned meals are dinners. */
@@ -99,6 +99,8 @@ export interface ChefStore {
   /** A week's meals with their ingredient lines, and what's been checked off or added by hand. */
   groceryWeek(weekStart: string): Promise<GroceryWeek>;
   checkGroceryItem(weekStart: string, key: string, checked: boolean): Promise<void>;
+  /** "have": already on hand, off the list. "need": shop for it. null: not said. */
+  setGroceryStatus(weekStart: string, key: string, status: GroceryStatus | null): Promise<void>;
   /** Adds something by hand ("paper towels"); returns its key. */
   addGroceryItem(weekStart: string, label: string, aisle: Aisle | null): Promise<string>;
   removeGroceryItem(weekStart: string, key: string): Promise<void>;
@@ -115,6 +117,8 @@ export type GroceryWeek = {
   marks: GroceryMark[];
   /** False until the grocery migration has run: check marks can't be saved yet. */
   ready: boolean;
+  /** False until the "already have it" migration has run. */
+  haveReady: boolean;
 };
 
 export const DEFAULT_SETTINGS: HouseholdSettings = {

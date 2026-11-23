@@ -24,7 +24,7 @@ describe("grocery_list", () => {
     const out = await session.groceryListTool({ week_start: "2026-11-30" });
     expect(out.ok).toBe(true);
     expect(out.text).toMatch(/Scallions(,| \(✓|$)/m); // 4 + 2 doubled
-    expect(out.text).toContain("Staples to check at home: Garlic, Olive oil");
+    expect(out.text).toContain("Not yet asked whether they have these on hand: Garlic, Olive oil");
     expect(session.groceryWeek).toBe("2026-11-30");
     expect(session.changes).toEqual([]);
   });
@@ -42,6 +42,19 @@ describe("grocery_list", () => {
     expect(session.changes).toEqual(["Updated the grocery list for the week of Nov 30"]);
   });
 
+  it("marks what they already have, and what they're out of", async () => {
+    const { store, session } = await setup();
+    const out = await session.groceryListTool({ week_start: "2026-11-30", have: ["olive oil", "scallions"], need: ["garlic"] });
+    expect(out.ok).toBe(true);
+    expect(out.text).toContain("Marked olive oil as already on hand.");
+    expect(out.text).toContain("Put garlic on the list to buy.");
+    const week = await store.groceryWeek("2026-11-30");
+    const list = buildGroceryList(week.meals, week.marks);
+    expect(list.have.map((i) => i.key)).toEqual(["olive oil", "scallion"]);
+    expect(list.sections.find((s) => s.aisle === "produce")?.items.map((i) => i.key)).toContain("garlic");
+    expect(list.pantryCheck.map((i) => i.key)).toEqual(["ramen noodle"]);
+  });
+
   it("rejects weeks that aren't Mondays or are over", async () => {
     const { session } = await setup();
     expect((await session.groceryListTool({ week_start: "2026-12-01" })).ok).toBe(false);
@@ -57,7 +70,7 @@ describe("grocery_list", () => {
 });
 
 describe("set_grocery_aisle", () => {
-  it("moves an ingredient out of staples, and back", async () => {
+  it("moves an ingredient out of the pantry check, and back", async () => {
     const { store, session } = await setup();
     const out = await session.setGroceryAisleTool({ ingredient: "garlic", aisle: "produce" });
     expect(out).toEqual({ ok: true, text: 'garlic is now under "Produce" on grocery lists.' });
@@ -65,7 +78,7 @@ describe("set_grocery_aisle", () => {
     expect(buildGroceryList(week.meals).sections.find((s) => s.aisle === "produce")?.items.some((i) => i.key === "garlic")).toBe(true);
     await session.setGroceryAisleTool({ ingredient: "garlic", aisle: "default" });
     week = await store.groceryWeek("2026-11-30");
-    expect(buildGroceryList(week.meals).staples.some((i) => i.key === "garlic")).toBe(true);
+    expect(buildGroceryList(week.meals).pantryCheck.some((i) => i.key === "garlic")).toBe(true);
     expect((await session.setGroceryAisleTool({ ingredient: "garlic", aisle: "aisle 9" })).ok).toBe(false);
     expect((await session.setGroceryAisleTool({ ingredient: "saffron", aisle: "baking" })).ok).toBe(false);
   });
