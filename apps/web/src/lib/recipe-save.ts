@@ -1,7 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { listTags } from "@/lib/recipes";
 import { matchKey, normalizeUnit, parseIngredientLine } from "@/lib/ingredient-line";
 import { validateRecipeEdit, type EditErrors } from "@/lib/recipe-edit";
+import { canonicalTags } from "@/lib/tags";
 
 export type SaveResult =
   | { ok: true; updatedAt: string }
@@ -27,6 +29,9 @@ export async function updateRecipe(recipeId: string, input: unknown, expectedUpd
   const { data: known } = await supabase.from("ingredients").select("id, name").eq("household_id", current.household_id);
   const byKey = new Map((known ?? []).map((i) => [matchKey(i.name), i.id]));
 
+  // Keep the household's spelling of each tag, so "asian" saves as "Asian".
+  const tags = canonicalTags(recipe.tags, await listTags(current.household_id, recipeId));
+
   const { data: updatedAt, error } = await supabase.rpc("save_recipe", {
     recipe_id: recipeId,
     expected_updated_at: expectedUpdatedAt,
@@ -35,7 +40,7 @@ export async function updateRecipe(recipeId: string, input: unknown, expectedUpd
       source_url: recipe.sourceUrl,
       total_minutes: recipe.totalMinutes,
       base_servings: recipe.servings,
-      tags: recipe.tags,
+      tags,
       notes: recipe.notes,
       steps_reconstructed: recipe.stepsReconstructed,
       ingredients: recipe.ingredients.map((i) => ({

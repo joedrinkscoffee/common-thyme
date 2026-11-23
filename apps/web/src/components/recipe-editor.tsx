@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } fr
 import { useRouter } from "next/navigation";
 import { deleteRecipe, saveRecipe } from "@/app/recipes/[id]/actions";
 import { AMOUNT_OPTIONAL, formatAmount, parseIngredientLine, UNITS, type Unit } from "@/lib/ingredient-line";
+import { cleanTag, tagKey } from "@/lib/tags";
 import { LIMITS, validateRecipeEdit, type EditErrors, type RecipeEditInput } from "@/lib/recipe-edit";
 
 /** What the page hands the editor. Plain data, so it can cross from the server. */
@@ -142,9 +143,11 @@ export function RecipeEditor({
     setForm((f) => ({ ...f, steps: f.steps.map((s, i) => (i === n ? { ...s, ...patch } : s)) }));
 
   function addTag(raw: string) {
-    const tag = raw.replace(/,/g, " ").replace(/\s+/g, " ").trim().toLowerCase().slice(0, LIMITS.tag);
+    const typed = cleanTag(raw, LIMITS.tag);
+    // Use the household's spelling when the tag already exists, so "asian" becomes "Asian".
+    const tag = knownTags.find((t) => tagKey(t) === tagKey(typed)) ?? typed;
     setTagDraft("");
-    if (!tag || form.tags.map((t) => t.toLowerCase()).includes(tag) || form.tags.length >= LIMITS.tags) return;
+    if (!tag || form.tags.some((t) => tagKey(t) === tagKey(tag)) || form.tags.length >= LIMITS.tags) return;
     set("tags", [...form.tags, tag]);
   }
 
@@ -231,7 +234,7 @@ export function RecipeEditor({
         ))}
       </datalist>
       <datalist id={`${id}-tags`}>
-        {knownTags.filter((t) => !form.tags.includes(t)).map((t) => (
+        {knownTags.filter((t) => !form.tags.some((x) => tagKey(x) === tagKey(t))).map((t) => (
           <option key={t} value={t} />
         ))}
       </datalist>

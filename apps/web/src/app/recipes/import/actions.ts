@@ -6,6 +6,8 @@ import { refresh } from "next/cache";
 import { parseRecipe } from "@/lib/recipe-import";
 import { downloadPhoto } from "@/lib/photo-fetch";
 import { tidyIngredientLines } from "@/lib/recipe-save";
+import { listTags } from "@/lib/recipes";
+import { canonicalTags } from "@/lib/tags";
 
 export type ImportOneResult =
   | { ok: true; title: string; photo: "saved" | "none" | "failed" }
@@ -26,6 +28,7 @@ export async function importRecipe(input: unknown): Promise<ImportOneResult> {
   }
   const householdId = viewer.household.id;
   const supabase = await createClient();
+  const tags = canonicalTags(recipe.tags, await listTags(householdId));
   const fail = (error: string): ImportOneResult => ({ ok: false, title: recipe.title, error });
 
   const { data: saved, error: recipeError } = await supabase
@@ -39,7 +42,7 @@ export async function importRecipe(input: unknown): Promise<ImportOneResult> {
         source_url: recipe.sourceUrl,
         total_minutes: recipe.totalMinutes,
         base_servings: recipe.servings,
-        tags: recipe.tags,
+        tags,
         steps_reconstructed: recipe.stepsReconstructed,
         notes: recipe.notes,
         updated_at: new Date().toISOString(),

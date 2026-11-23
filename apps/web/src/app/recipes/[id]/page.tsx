@@ -12,6 +12,7 @@ import { RebuiltStepsNotice } from "@/components/rebuilt-steps-notice";
 import { checkSourcePage } from "@/lib/source-page";
 import { sampleRecipes } from "@/lib/sample-recipes";
 import { KID_FRIENDLY_TAG } from "@/lib/recipe-edit";
+import { countTags } from "@/lib/tags";
 
 export const metadata: Metadata = { title: "Recipe · Common Thyme" };
 
@@ -57,7 +58,7 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
   const household = viewer.kind === "signed-in" ? viewer.household : null;
   const [knownIngredients, knownTags, upcomingDinners] = household
     ? await Promise.all([listIngredientNames(household.id), listTags(household.id), countUpcomingDinners(recipe.id)])
-    : [[], [...new Set([...sampleRecipes.flatMap((r) => r.tags.map((t) => t.toLowerCase())), KID_FRIENDLY_TAG])].sort(), 0];
+    : [[], [...new Set([...countTags(sampleRecipes.map((r) => r.tags)).map((c) => c.tag), KID_FRIENDLY_TAG])], 0];
 
   return (
     <article className="flex flex-wrap items-start gap-8">

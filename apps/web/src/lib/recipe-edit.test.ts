@@ -28,7 +28,7 @@ describe("validateRecipeEdit", () => {
     expect(r.recipe.title).toBe("Carrot Salad");
     expect(r.recipe.sourceUrl).toBeNull();
     expect(r.recipe.totalMinutes).toBe(20);
-    expect(r.recipe.tags).toEqual(["salad", "quick"]);
+    expect(r.recipe.tags).toEqual(["Salad", "quick"]);
     expect(r.recipe.ingredients).toEqual([
       { quantity: 1.5, unit: "cup", name: "carrot", prep: "shredded", ingredientId: null, rawText: "1 1/2 cup carrot, shredded" },
       { quantity: null, unit: "to taste", name: "salt", prep: null, ingredientId: null, rawText: "salt, to taste" },

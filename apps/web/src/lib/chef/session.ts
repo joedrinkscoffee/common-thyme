@@ -550,7 +550,7 @@ export class ChefSession {
       sourceUrl: source,
       totalMinutes: minutes,
       servings,
-      tags: strings(input.tags, 12).map((t) => t.toLowerCase()),
+      tags: strings(input.tags, 12),
       ingredientLines,
       steps,
       perishable: strings(input.perishable, 40),

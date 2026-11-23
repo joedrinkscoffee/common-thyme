@@ -166,7 +166,7 @@ describe("recipes and notes", () => {
     const { store, session } = await setup(undefined, photo);
     const out = await session.saveRecipeTool({ title: "Card Recipe", ingredients: ["2 eggs"], steps: ["Whisk.", "Cook."], perishable: ["egg"], photo: "attached", tags: ["Breakfast"] });
     expect(out.ok).toBe(true);
-    expect(store.created[0]).toMatchObject({ title: "Card Recipe", photo, tags: ["breakfast"], steps: [{ body: "Whisk." }, { body: "Cook." }] });
+    expect(store.created[0]).toMatchObject({ title: "Card Recipe", photo, tags: ["Breakfast"], steps: [{ body: "Whisk." }, { body: "Cook." }] });
     expect((await session.saveRecipeTool({ title: "x", ingredients: [], steps: ["a"], perishable: [], photo: "none" })).ok).toBe(false);
   });
 
