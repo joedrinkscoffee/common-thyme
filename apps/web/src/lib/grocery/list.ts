@@ -46,7 +46,7 @@ export type GroceryUse = { mealId: string; date: string; meal: MealType; title: 
 export type GroceryItem = {
   key: string;
   name: string;
-  /** "2 lb", "1 1/2 cups + 2", or null when no recipe says how much. */
+  /** "2 lb" or "×3"; null when one will do or it's bought by the carton. */
   amount: string | null;
   aisle: Aisle;
   uses: GroceryUse[];
@@ -70,57 +70,35 @@ export type GroceryList = {
 
 // ------------------------------------------------------------------ amounts
 
-const VOLUME_TSP: Partial<Record<Unit, number>> = { tsp: 1, tbsp: 3, "fl oz": 6, cup: 48, ml: 0.202884, l: 202.884 };
 const WEIGHT_OZ: Partial<Record<Unit, number>> = { oz: 1, lb: 16, g: 0.035274, kg: 35.274 };
-const NO_AMOUNT: Unit[] = ["pinch", "dash", "to taste"];
+/** Units you can count at the store: "2 lemons", "1 bunch", "2 cans". Cups, spoons and cloves aren't. */
+const COUNTED: (Unit | null)[] = [null, "each", "bunch", "head", "can", "package", "piece", "stalk"];
+/** Aisles where weight is how you buy (proteins and vegetables). */
+const BY_WEIGHT: Aisle[] = ["produce", "meat"];
+/** Aisles bought by the carton or container: no amount at all (eggs, oat milk, half and half). */
+const NO_AMOUNT: Aisle[] = ["dairy", "staples"];
 
-const PLURAL: Partial<Record<Unit, string>> = {
-  cup: "cups", clove: "cloves", can: "cans", bunch: "bunches", head: "heads", slice: "slices", piece: "pieces",
-  sprig: "sprigs", stalk: "stalks", package: "packages",
-};
-
-/** Rounds up to a quarter, so a scaled 1.1 lemons reads 1 1/4 and nothing rounds to zero. */
-const roundUp = (n: number, step = 0.25) => Math.max(step, Math.ceil(n / step - 1e-6) * step);
-
-function withUnit(n: number, unit: Unit | null): string {
-  const amount = formatAmount(n);
-  if (!unit || unit === "each") return amount;
-  return `${amount} ${n > 1 && PLURAL[unit] ? PLURAL[unit] : unit}`;
-}
-
-function volumeText(tsp: number): string {
-  if (tsp >= 12) return withUnit(roundUp(tsp / 48), "cup");
-  if (tsp >= 3) return withUnit(roundUp(tsp / 3, 0.5), "tbsp");
-  return withUnit(roundUp(tsp), "tsp");
-}
-
-function weightText(oz: number): string {
-  if (oz >= 16) return withUnit(roundUp(oz / 16), "lb");
-  return withUnit(roundUp(oz, 0.5), "oz");
-}
-
-/** Adds up amounts in every unit they came in: volumes together, weights together, the rest per unit. */
-export function combineAmounts(parts: { quantity: number | null; unit: Unit | null }[]): string | null {
-  let tsp = 0;
+/**
+ * How much to buy, the way you'd shop: a weight for proteins and vegetables
+ * ("1 1/2 lb"), otherwise a whole count shown only when it's more than one
+ * ("×3"). Never cups or spoons; one of something needs no amount.
+ */
+export function shoppingAmount(parts: { quantity: number | null; unit: Unit | null }[], aisle: Aisle): string | null {
+  if (NO_AMOUNT.includes(aisle)) return null;
   let oz = 0;
-  const counts = new Map<string, number>(); // unit ("" for plain counts) -> total
+  let count = 0;
   for (const p of parts) {
-    if (p.quantity === null || !(p.quantity > 0) || (p.unit && NO_AMOUNT.includes(p.unit))) continue;
-    const u = p.unit;
-    if (u && VOLUME_TSP[u]) tsp += p.quantity * VOLUME_TSP[u]!;
-    else if (u && WEIGHT_OZ[u]) oz += p.quantity * WEIGHT_OZ[u]!;
-    else {
-      const k = !u || u === "each" ? "" : u;
-      counts.set(k, (counts.get(k) ?? 0) + p.quantity);
-    }
+    if (p.quantity === null || !(p.quantity > 0)) continue;
+    const perOz = p.unit ? WEIGHT_OZ[p.unit] : undefined;
+    if (perOz) oz += p.quantity * perOz;
+    else if (COUNTED.includes(p.unit)) count += p.quantity;
   }
-  const out: string[] = [];
-  if (oz) out.push(weightText(oz));
-  const plain = counts.get("");
-  if (plain) out.push(withUnit(roundUp(plain, 0.5), null));
-  for (const [u, n] of counts) if (u) out.push(withUnit(roundUp(n, 0.5), u as Unit));
-  if (tsp) out.push(volumeText(tsp));
-  return out.length ? out.join(" + ") : null;
+  if (oz && BY_WEIGHT.includes(aisle)) {
+    if (oz >= 16) return `${formatAmount(Math.ceil((oz / 16) * 4 - 1e-6) / 4)} lb`;
+    return `${Math.ceil(oz - 1e-6)} oz`;
+  }
+  const whole = Math.ceil(count - 1e-6);
+  return whole >= 2 ? `×${whole}` : null;
 }
 
 // ------------------------------------------------------------------ names
@@ -176,7 +154,7 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
     items.push({
       key: acc.key,
       name: cap(name),
-      amount: combineAmounts(acc.parts),
+      amount: shoppingAmount(acc.parts, acc.aisle),
       aisle: acc.aisle,
       uses: acc.uses.sort((a, b) => a.date.localeCompare(b.date)),
       checked: mark?.checked ?? false,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGroceryList, combineAmounts, extraKey, groceryText, type GroceryMeal } from "./list";
+import { buildGroceryList, shoppingAmount, extraKey, groceryText, type GroceryMeal } from "./list";
 import { parseIngredientLine } from "../ingredient-line";
 
 const meal = (id: string, date: string, title: string, raws: string[], scale = 1): GroceryMeal => ({
@@ -11,20 +11,26 @@ const meal = (id: string, date: string, title: string, raws: string[], scale = 1
   lines: raws.map((raw) => ({ raw, ...parseIngredientLine(raw) })),
 });
 
-describe("combineAmounts", () => {
-  it("adds volumes and weights across units", () => {
-    expect(combineAmounts([{ quantity: 2, unit: "tbsp" }, { quantity: 1, unit: "tbsp" }])).toBe("3 tbsp");
-    expect(combineAmounts([{ quantity: 0.5, unit: "cup" }, { quantity: 4, unit: "tbsp" }])).toBe("3/4 cup");
-    expect(combineAmounts([{ quantity: 12, unit: "oz" }, { quantity: 1, unit: "lb" }])).toBe("1 3/4 lb");
-    expect(combineAmounts([{ quantity: 8, unit: "oz" }])).toBe("8 oz");
+describe("shoppingAmount", () => {
+  it("gives proteins and vegetables a weight", () => {
+    expect(shoppingAmount([{ quantity: 12, unit: "oz" }, { quantity: 1, unit: "lb" }], "meat")).toBe("1 3/4 lb");
+    expect(shoppingAmount([{ quantity: 4, unit: "oz" }, { quantity: 6, unit: "oz" }], "produce")).toBe("10 oz");
   });
-  it("keeps counts and other units apart", () => {
-    expect(combineAmounts([{ quantity: 2, unit: "each" }, { quantity: 1, unit: "bunch" }, { quantity: 1, unit: null }])).toBe("3 + 1 bunch");
-    expect(combineAmounts([{ quantity: 2, unit: "can" }])).toBe("2 cans");
+  it("counts whole things, and only says so past one", () => {
+    expect(shoppingAmount([{ quantity: 1, unit: "each" }, { quantity: 1.5, unit: null }], "produce")).toBe("×3");
+    expect(shoppingAmount([{ quantity: 1, unit: "each" }], "produce")).toBeNull();
+    expect(shoppingAmount([{ quantity: 0.5, unit: "bunch" }], "produce")).toBeNull();
+    expect(shoppingAmount([{ quantity: 2, unit: "can" }], "pantry")).toBe("×2");
   });
-  it("rounds up and skips amounts nobody can measure", () => {
-    expect(combineAmounts([{ quantity: 1.1, unit: "each" }])).toBe("1 1/2");
-    expect(combineAmounts([{ quantity: null, unit: "to taste" }, { quantity: 1, unit: "pinch" }])).toBeNull();
+  it("never shows cups or spoons", () => {
+    expect(shoppingAmount([{ quantity: 2, unit: "cup" }], "produce")).toBeNull();
+    expect(shoppingAmount([{ quantity: 1, unit: "bunch" }, { quantity: 2, unit: "cup" }], "produce")).toBeNull();
+    expect(shoppingAmount([{ quantity: 0.5, unit: "cup" }], "pantry")).toBeNull();
+    expect(shoppingAmount([{ quantity: 8, unit: "oz" }], "grains")).toBeNull();
+  });
+  it("leaves eggs, milk and cream without an amount", () => {
+    expect(shoppingAmount([{ quantity: 4, unit: "each" }], "dairy")).toBeNull();
+    expect(shoppingAmount([{ quantity: 1, unit: "cup" }], "dairy")).toBeNull();
   });
 });
 
@@ -39,7 +45,7 @@ describe("buildGroceryList", () => {
     const list = buildGroceryList(week);
     const produce = list.sections.find((s) => s.aisle === "produce")!;
     const scallions = produce.items.find((i) => i.key === "scallion")!;
-    expect(scallions.amount).toBe("8"); // 4 + 2×2
+    expect(scallions.amount).toBe("×8"); // 4 + 2 doubled
     expect(scallions.uses.map((u) => u.date)).toEqual(["2026-11-30", "2026-12-01"]);
     const kale = produce.items.find((i) => i.key === "kale" || i.key === "dino kale");
     expect(kale).toBeTruthy();
@@ -69,8 +75,8 @@ describe("buildGroceryList", () => {
 
   it("keeps canned goods apart from fresh ones, in the pantry aisle", () => {
     const list = buildGroceryList([meal("m1", "2026-11-30", "Shrimp", ["1 can diced tomatoes", "2 tomatoes"])]);
-    expect(list.sections.find((s) => s.aisle === "pantry")?.items.map((i) => [i.name, i.amount])).toEqual([["Canned tomatoes", "1 can"]]);
-    expect(list.sections.find((s) => s.aisle === "produce")?.items.map((i) => [i.name, i.amount])).toEqual([["Tomatoes", "2"]]);
+    expect(list.sections.find((s) => s.aisle === "pantry")?.items.map((i) => [i.name, i.amount])).toEqual([["Canned tomatoes", null]]);
+    expect(list.sections.find((s) => s.aisle === "produce")?.items.map((i) => [i.name, i.amount])).toEqual([["Tomatoes", "×2"]]);
   });
 
   it("is empty with no meals, and says so", () => {
