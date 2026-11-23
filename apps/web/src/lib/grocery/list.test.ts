@@ -54,8 +54,8 @@ describe("buildGroceryList", () => {
   it("groups by aisle in store order and asks about pantry items first", () => {
     const list = buildGroceryList(week);
     expect(list.sections.map((s) => s.aisle)).toEqual(["produce", "bakery", "cheese", "dairy"]);
-    expect(list.pantryCheck.map((i) => i.name)).toEqual(["Garlic", "Kalamata olives", "Olive oil", "Salt & pepper", "White miso"]);
-    expect(list.pantryCheck.map((i) => i.aisle)).toEqual(["produce", "pantry", "pantry", "baking", "international"]);
+    expect(list.pantryCheck.map((i) => i.name)).toEqual(["Garlic", "Kalamata olives", "White miso"]);
+    expect(list.pantryCheck.map((i) => i.aisle)).toEqual(["produce", "pantry", "international"]);
     expect(list.total).toBe(list.sections.flatMap((s) => s.items).length);
   });
 
@@ -87,9 +87,8 @@ describe("buildGroceryList", () => {
     ]);
     const all = [...list.sections.flatMap((s) => s.items), ...list.pantryCheck];
     const names = all.map((i) => i.name).sort();
-    expect(names).toEqual(["Eggs", "Garlic", "Ginger", "Mushrooms", "Salt & pepper", "Scallions", "Shiitake mushrooms"]);
+    expect(names).toEqual(["Eggs", "Garlic", "Ginger", "Mushrooms", "Scallions", "Shiitake mushrooms"]);
     expect(all.find((i) => i.name === "Scallions")?.uses.map((u) => u.title)).toEqual(["Stir Fry"]);
-    expect(all.find((i) => i.name === "Salt & pepper")?.amount).toBeNull();
     expect(all.find((i) => i.name === "Eggs")?.uses).toHaveLength(2);
     expect(all.find((i) => i.name === "Mushrooms")?.amount).toBe("12 oz");
   });
@@ -109,6 +108,17 @@ describe("buildGroceryList", () => {
     expect(list.pantryCheck.map((i) => i.name)).toEqual(["Calabrian chili paste", "Jasmine rice"]);
     expect(list.total).toBe(1);
     expect(groceryText(list)).toMatch(/Already have \(not shopping for\): Carrots, Soy sauce/);
+  });
+
+  it("never lists salt & pepper or olive oil, merges baby spinach, and asks about ginger", () => {
+    const list = buildGroceryList([
+      meal("m1", "2026-11-30", "Salad", ["2 cups baby spinach", "2 tbsp extra virgin olive oil", "Kosher salt and black pepper", "1 tbsp olive oil", "1 inch fresh ginger"]),
+      meal("m2", "2026-12-01", "Saag", ["1 lb spinach", "salt to taste", "EVOO"]),
+    ]);
+    const all = [...list.sections.flatMap((s) => s.items), ...list.pantryCheck];
+    expect(all.map((i) => i.name).sort()).toEqual(["Ginger", "Spinach"]);
+    expect(all.find((i) => i.name === "Spinach")?.uses).toHaveLength(2);
+    expect(list.pantryCheck.map((i) => [i.name, i.aisle])).toEqual([["Ginger", "produce"]]);
   });
 
   it("is empty with no meals, and says so", () => {

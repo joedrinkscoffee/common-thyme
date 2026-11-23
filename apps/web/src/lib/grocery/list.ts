@@ -2,13 +2,14 @@
  * The grocery list for a week, built from its planned meals: every
  * ingredient line, scaled to the servings planned, combined across recipes
  * and grouped by aisle in the order you walk the store. Pantry and
- * multi-use items (soy sauce, rice, eggs) are asked about first: anything
- * marked "already have it" drops off the list.
+ * multi-use items (soy sauce, rice, eggs, ginger) are asked about first:
+ * anything marked "already have it" drops off the list. Salt & pepper and
+ * olive oil are never listed.
  *
  * Pure: the page and Chef both call it with what the store loaded.
  */
 import { formatAmount, matchKey, parseIngredientLine, type Unit } from "../ingredient-line";
-import { shoppingName, shoppingParts } from "./names";
+import { alwaysOnHand, shoppingName, shoppingParts } from "./names";
 import { AISLES, AISLE_LABEL, aisleOf, isAisle, likelyOnHand, shopAisle, soldByBunch, type Aisle } from "./aisles";
 import type { MealType } from "../chef/store";
 
@@ -134,6 +135,7 @@ export function buildGroceryList(meals: GroceryMeal[], marks: GroceryMark[] = []
     for (const line of m.lines) {
       const written = line.name ?? parseIngredientLine(line.raw).name ?? line.raw;
       for (const part of shoppingParts(written, line.quantity, line.unit)) {
+        if (alwaysOnHand(part.name)) continue;
         // Canned tomatoes aren't fresh tomatoes: a can is its own item, in the pantry aisle.
         const canned = part.unit === "can" && !/\bcanned\b/i.test(part.name);
         const base = matchKey(part.name);

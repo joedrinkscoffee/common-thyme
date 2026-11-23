@@ -24,7 +24,7 @@ describe("grocery_list", () => {
     const out = await session.groceryListTool({ week_start: "2026-11-30" });
     expect(out.ok).toBe(true);
     expect(out.text).toMatch(/Scallions(,| \(✓|$)/m); // 4 + 2 doubled
-    expect(out.text).toContain("Not yet asked whether they have these on hand: Garlic, Olive oil");
+    expect(out.text).toContain("Not yet asked whether they have these on hand: Garlic, Ramen noodles");
     expect(session.groceryWeek).toBe("2026-11-30");
     expect(session.changes).toEqual([]);
   });
@@ -44,15 +44,15 @@ describe("grocery_list", () => {
 
   it("marks what they already have, and what they're out of", async () => {
     const { store, session } = await setup();
-    const out = await session.groceryListTool({ week_start: "2026-11-30", have: ["olive oil", "scallions"], need: ["garlic"] });
+    const out = await session.groceryListTool({ week_start: "2026-11-30", have: ["ramen noodles", "scallions"], need: ["garlic"] });
     expect(out.ok).toBe(true);
-    expect(out.text).toContain("Marked olive oil as already on hand.");
+    expect(out.text).toContain("Marked ramen noodles as already on hand.");
     expect(out.text).toContain("Put garlic on the list to buy.");
     const week = await store.groceryWeek("2026-11-30");
     const list = buildGroceryList(week.meals, week.marks);
-    expect(list.have.map((i) => i.key)).toEqual(["olive oil", "scallion"]);
+    expect(list.have.map((i) => i.key)).toEqual(["ramen noodle", "scallion"]);
     expect(list.sections.find((s) => s.aisle === "produce")?.items.map((i) => i.key)).toContain("garlic");
-    expect(list.pantryCheck.map((i) => i.key)).toEqual(["ramen noodle"]);
+    expect(list.pantryCheck).toEqual([]);
   });
 
   it("rejects weeks that aren't Mondays or are over", async () => {
