@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeUnit, parseIngredientLine, type Unit } from "@/lib/ingredient-line";
 import { KID_FRIENDLY_TAG } from "@/lib/recipe-edit";
+import { countTags, tagKey, type TagCount } from "@/lib/tags";
 
 export type RecipeCard = {
   id: string;
@@ -151,12 +152,25 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
   };
 }
 
-/** Every tag the household uses, for the editor's suggestions. */
-export async function listTags(householdId: string): Promise<string[]> {
+/**
+ * Every tag the household uses, in its usual spelling, for the editor's
+ * suggestions and for keeping saves consistent. Pass `exceptRecipeId` to
+ * leave out the recipe being saved, so its own spelling doesn't vote.
+ */
+export async function listTags(householdId: string, exceptRecipeId?: string): Promise<string[]> {
+  const counts = await listTagCounts(householdId, exceptRecipeId);
+  const tags = counts.map((c) => c.tag);
+  if (!tags.some((t) => tagKey(t) === KID_FRIENDLY_TAG)) tags.push(KID_FRIENDLY_TAG);
+  return tags.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** Every tag the household uses with how many recipes have it, most used first. */
+export async function listTagCounts(householdId: string, exceptRecipeId?: string): Promise<TagCount[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("recipes").select("tags").eq("household_id", householdId).is("archived_at", null);
-  const used = (data ?? []).flatMap((r) => (r.tags ?? []) as string[]).map((t) => t.toLowerCase());
-  return [...new Set([...used, KID_FRIENDLY_TAG])].sort();
+  let query = supabase.from("recipes").select("tags").eq("household_id", householdId).is("archived_at", null);
+  if (exceptRecipeId) query = query.neq("id", exceptRecipeId);
+  const { data } = await query;
+  return countTags((data ?? []).map((r) => (r.tags ?? []) as string[]));
 }
 
 /** How many dinners from today on still plan to cook this recipe. */

@@ -49,9 +49,14 @@ export default function RecipesPage(props: PageProps<"/recipes">) {
       <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 pb-10 sm:px-6">
         <div className="mb-3 mt-4 flex flex-wrap items-end justify-between gap-3">
           <h1 className="m-0 font-display text-4xl font-extrabold leading-none tracking-tight">Recipes</h1>
-          <Link href="/recipes/import" className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold text-ink no-underline transition-colors hover:bg-lemon">
-            Import
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/recipes/tags" className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold text-ink no-underline transition-colors hover:bg-lemon">
+              Tags
+            </Link>
+            <Link href="/recipes/import" className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold text-ink no-underline transition-colors hover:bg-lemon">
+              Import
+            </Link>
+          </div>
         </div>
         <Suspense fallback={<p className="text-muted">Getting your recipes…</p>}>
           <Library searchParams={props.searchParams} />

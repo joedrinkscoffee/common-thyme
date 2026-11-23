@@ -2,6 +2,7 @@
  * The rules for an edited recipe. Shared by the recipe page's editor and the
  * server (and later by Chef), so every save is checked the same way.
  */
+import { tagKey } from "./tags";
 import { AMOUNT_OPTIONAL, formatIngredientLine, normalizeUnit, parseAmount, type Unit } from "./ingredient-line";
 
 /** A regular tag, always offered in the editor; Chef uses it for dinners shared with the kids. */
@@ -105,8 +106,8 @@ export function validateRecipeEdit(input: unknown): Checked {
 
   const tags: string[] = [];
   for (const t of Array.isArray(r.tags) ? r.tags : []) {
-    const tag = text(t).toLowerCase().slice(0, LIMITS.tag);
-    if (tag && !tags.includes(tag)) tags.push(tag);
+    const tag = text(t).slice(0, LIMITS.tag).trim();
+    if (tag && !tags.some((x) => tagKey(x) === tagKey(tag))) tags.push(tag);
   }
   if (tags.length > LIMITS.tags) errors.tags = `Up to ${LIMITS.tags} tags.`;
 

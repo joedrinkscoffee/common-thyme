@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { RecipeCard } from "@/lib/recipes";
+import { countTags, tagKey } from "@/lib/tags";
 
 const TINTS = ["#f0b98a", "#9fcb8a", "#f2cf78", "#bfd48e", "#e7d3b0"];
 
@@ -11,14 +12,13 @@ export function RecipeLibrary({ recipes }: { recipes: RecipeCard[] }) {
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState<string | null>(null);
 
-  const tags = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of recipes) for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
-  }, [recipes]);
+  // "Asian" and "asian" are one chip.
+  const tags = useMemo(() => countTags(recipes.map((r) => r.tags)).map((c) => c.tag), [recipes]);
 
   const q = query.trim().toLowerCase();
-  const shown = recipes.filter((r) => (!tag || r.tags.includes(tag)) && (!q || r.title.toLowerCase().includes(q)));
+  const shown = recipes.filter(
+    (r) => (!tag || r.tags.some((t) => tagKey(t) === tagKey(tag))) && (!q || r.title.toLowerCase().includes(q)),
+  );
 
   return (
     <>
