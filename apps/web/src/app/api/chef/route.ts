@@ -72,12 +72,12 @@ export async function POST(request: Request) {
       text,
       partnerJoined: household.memberCount > 1,
     });
-    const payload = { choice: reply.choice, changes: reply.changes, usage: reply.usage };
+    const payload = { choice: reply.choice, changes: reply.changes, grocery: reply.grocery, usage: reply.usage };
     const id = await saveMessage(db, household.id, { role: "chef", authorId: null, body: reply.text, payload });
     return json({
       ok: true,
       changed: reply.changes.length > 0,
-      reply: { id: id ?? crypto.randomUUID(), role: "chef", author: null, body: reply.text, choice: reply.choice, changes: reply.changes, at: new Date().toISOString() },
+      reply: { id: id ?? crypto.randomUUID(), role: "chef", author: null, body: reply.text, choice: reply.choice, changes: reply.changes, grocery: reply.grocery, at: new Date().toISOString() },
     });
   } catch (e) {
     const changed = session.changes.length > 0;

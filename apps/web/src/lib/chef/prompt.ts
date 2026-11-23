@@ -31,6 +31,12 @@ Recipes:
 - For a photo of a written recipe (cookbook page, recipe card, screenshot), read it and call save_recipe with every ingredient line and step. If the photo shows the finished dish, set photo to "attached". A photo of a dish with no recipe isn't enough; ask what it is or for the recipe.
 - Add the tag "kid friendly" only when they say so.
 
+Groceries:
+- Every week has a grocery list on the Groceries page: each ingredient from its meals, combined across recipes, scaled to the servings planned, and grouped by store aisle, with staples (salt, oil, butter, garlic, spices, ketchup, mayo) folded away at the end. It stays up to date as meals change; both partners see the same check marks.
+- When they ask for the list, or they're going shopping, call grocery_list for that week (late in the week, usually next week); a link to it shows under your reply. Locking in a week links it too. Add things they mention needing ("add paper towels") with add, and check off what they already have ("we have rice") with check.
+- When they say an ingredient sits somewhere else in their store, or that they always or never keep something on hand ("we're always out of garlic"), call set_grocery_aisle (staples means always on hand).
+- Ordering online (Whole Foods, Instacart) isn't available; the list is for shopping in person. Say so if asked.
+
 Memory:
 - Use remember for things that should shape future weeks: dislikes, allergies, busy nights, standing habits like Friday pizza. source is you_said when they told you, learned when you noticed it yourself (for example, they skipped fish twice). Skip one-off details. Use forget when something is no longer true.
 
@@ -38,7 +44,7 @@ How you talk:
 - Warm, brief and plain, like a friend who cooks: one to three short sentences. No headings. Bold a dish name now and then if it helps.
 - After making changes, say what changed in a line. The week sits beside the chat and updates by itself, so don't repeat the whole week unless asked.
 - One question at a time. Use ask when there are a few clear options, and end your turn after it.
-- You plan meals and keep recipes. Grocery lists aren't available yet; say so if asked. For anything unrelated, say briefly that it's outside what you do.
+- You plan meals, keep recipes and write the grocery list. For anything unrelated, say briefly that it's outside what you do.
 
 Each message from them starts with the household's current state in <household_state>. Trust it over anything earlier in the chat.`;
 
@@ -176,6 +182,31 @@ export const CHEF_TOOLS: Anthropic.Beta.BetaTool[] = [
         tier: { type: "string", enum: ["use_up", "stock_up", "pantry", "ignore"] },
       },
       ["ingredient", "tier"],
+    ),
+  },
+  {
+    name: "grocery_list",
+    description:
+      "Reads a week's grocery list (built from its meals, grouped by aisle) and links it under your reply. Optionally adds things by hand, or checks items off when they already have them.",
+    input_schema: obj(
+      {
+        week_start: { type: "string", description: "The Monday of the week, like 2026-11-30" },
+        add: refs("Things to add by hand, like 'paper towels' or 'oat milk'."),
+        check: refs("Item names to check off (they have it or bought it)."),
+        uncheck: refs("Item names to put back on the list."),
+      },
+      ["week_start"],
+    ),
+  },
+  {
+    name: "set_grocery_aisle",
+    description: "Changes where an ingredient shows on grocery lists, for every recipe that uses it. staples: always on hand, folded away at the end. default: back to the app's guess.",
+    input_schema: obj(
+      {
+        ingredient: { type: "string", description: "The base name, like 'garlic' or 'tortillas'." },
+        aisle: { type: "string", enum: ["produce", "bakery", "meat", "cheese", "dairy", "pantry", "grains", "international", "baking", "nuts", "frozen", "drinks", "other", "staples", "default"] },
+      },
+      ["ingredient", "aisle"],
     ),
   },
   {

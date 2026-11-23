@@ -5,6 +5,8 @@
  */
 import type { CatalogRecipe } from "./planner";
 import type { ShareTier } from "./ingredient-tier";
+import type { Aisle } from "../grocery/aisles";
+import type { GroceryMark, GroceryMeal } from "../grocery/list";
 
 export type DinnerStatus = "planned" | "cooked" | "skipped" | "moved";
 /** Which meal of the day. Most planned meals are dinners. */
@@ -94,10 +96,26 @@ export interface ChefStore {
   updateDinner(id: string, patch: DinnerPatch): Promise<void>;
   deleteDinner(id: string): Promise<void>;
 
+  /** A week's meals with their ingredient lines, and what's been checked off or added by hand. */
+  groceryWeek(weekStart: string): Promise<GroceryWeek>;
+  checkGroceryItem(weekStart: string, key: string, checked: boolean): Promise<void>;
+  /** Adds something by hand ("paper towels"); returns its key. */
+  addGroceryItem(weekStart: string, label: string, aisle: Aisle | null): Promise<string>;
+  removeGroceryItem(weekStart: string, key: string): Promise<void>;
+  /** Sets where the household finds an ingredient in the store; returns how many ingredients matched. */
+  setIngredientAisle(name: string, aisle: Aisle | null): Promise<number>;
+
   notes(): Promise<ChefNote[]>;
   addNote(note: Omit<ChefNote, "id">): Promise<ChefNote>;
   forgetNote(id: string): Promise<void>;
 }
+
+export type GroceryWeek = {
+  meals: GroceryMeal[];
+  marks: GroceryMark[];
+  /** False until the grocery migration has run: check marks can't be saved yet. */
+  ready: boolean;
+};
 
 export const DEFAULT_SETTINGS: HouseholdSettings = {
   timezone: "America/New_York",

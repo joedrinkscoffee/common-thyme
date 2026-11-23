@@ -7,6 +7,10 @@ import { updateRecipe } from "@/lib/recipe-save";
 import type { RecipeEditInput } from "@/lib/recipe-edit";
 import type { CatalogRecipe } from "./planner";
 import { tierOf, type ShareTier } from "./ingredient-tier";
+import { addDays } from "./dates";
+import { normalizeUnit } from "@/lib/ingredient-line";
+import { extraKey, type GroceryLine, type GroceryMark } from "@/lib/grocery/list";
+import type { Aisle } from "@/lib/grocery/aisles";
 import {
   DEFAULT_SETTINGS,
   type ChefNote,
@@ -20,6 +24,7 @@ import {
   type StoredDinner,
   byDayAndMeal,
   type StoredPlan,
+  type GroceryWeek,
 } from "./store";
 
 type One<T> = T | T[] | null;
@@ -309,6 +314,103 @@ export class SupabaseChefStore implements ChefStore {
   async deleteDinner(id: string) {
     const { error } = await this.db.from("planned_dinners").delete().eq("id", id).eq("household_id", this.householdId);
     if (error) fail("remove dinner", error);
+  }
+
+  async groceryWeek(weekStart: string): Promise<GroceryWeek> {
+    type IngRow = { name: string; aisle?: string | null };
+    type LineRow = { position: number; raw_text: string; quantity: number | string | null; unit: string | null; name: string | null; ingredients: One<IngRow> };
+    type MealRow = { id: string; date: string; meal: StoredDinner["meal"] | null; servings: number; recipes: One<{ title: string; base_servings: number; recipe_ingredients: LineRow[] | null }> };
+    const read = (aisle: boolean) =>
+      this.db
+        .from("planned_dinners")
+        .select(`id, date, meal, servings, recipes(title, base_servings, recipe_ingredients(position, raw_text, quantity, unit, name, ingredients(name${aisle ? ", aisle" : ""})))`)
+        .eq("household_id", this.householdId)
+        .gte("date", weekStart)
+        .lte("date", addDays(weekStart, 6))
+        .in("status", ["planned", "cooked"]);
+    let got = await read(true);
+    // Before the grocery migration runs there's no aisle column; read without it.
+    if (got.error) got = await read(false);
+    if (got.error) fail("read grocery meals", got.error);
+    const meals = ((got.data ?? []) as unknown as MealRow[])
+      .map((d) => {
+        const r = one(d.recipes);
+        const lines: GroceryLine[] = [...(r?.recipe_ingredients ?? [])]
+          .sort((a, b) => a.position - b.position)
+          .map((l) => {
+            const ing = one(l.ingredients);
+            const parsed = l.name ? null : parseIngredientLine(l.raw_text);
+            return {
+              raw: l.raw_text,
+              name: ing?.name ?? l.name ?? parsed?.name ?? null,
+              quantity: parsed ? parsed.quantity : l.quantity === null ? null : Number(l.quantity),
+              unit: parsed ? parsed.unit : normalizeUnit(l.unit),
+              aisle: ing?.aisle ?? null,
+            };
+          });
+        return { id: d.id, date: d.date, meal: d.meal ?? "dinner", title: r?.title ?? "a deleted recipe", scale: d.servings / (r?.base_servings || 2), lines };
+      })
+      .sort(byDayAndMeal);
+
+    const { data: rows, error } = await this.db
+      .from("grocery_items")
+      .select("item_key, label, aisle, checked_at, checked_by")
+      .eq("household_id", this.householdId)
+      .eq("week_start", weekStart);
+    if (error) return { meals, marks: [], ready: false };
+    const people = [...new Set((rows ?? []).map((r) => r.checked_by).filter((x): x is string => !!x))];
+    const names = new Map<string, string>();
+    if (people.length) {
+      const { data: ps } = await this.db.from("profiles").select("id, display_name").in("id", people);
+      for (const p of ps ?? []) if (p.display_name) names.set(p.id, p.display_name.split(" ")[0]);
+    }
+    const marks: GroceryMark[] = (rows ?? []).map((r) => ({
+      key: r.item_key,
+      label: r.label,
+      aisle: r.aisle,
+      checked: !!r.checked_at,
+      checkedBy: r.checked_by ? (names.get(r.checked_by) ?? null) : null,
+    }));
+    return { meals, marks, ready: true };
+  }
+
+  async checkGroceryItem(weekStart: string, key: string, checked: boolean) {
+    const { error } = await this.db.from("grocery_items").upsert(
+      {
+        household_id: this.householdId,
+        week_start: weekStart,
+        item_key: key.slice(0, 120),
+        checked_at: checked ? new Date().toISOString() : null,
+        checked_by: checked ? this.userId : null,
+      },
+      { onConflict: "household_id,week_start,item_key" },
+    );
+    if (error) fail("check grocery item", error);
+  }
+
+  async addGroceryItem(weekStart: string, label: string, aisle: Aisle | null) {
+    const key = extraKey(label);
+    const { error } = await this.db.from("grocery_items").upsert(
+      { household_id: this.householdId, week_start: weekStart, item_key: key, label: label.slice(0, 120), aisle, checked_at: null, checked_by: null },
+      { onConflict: "household_id,week_start,item_key" },
+    );
+    if (error) fail("add grocery item", error);
+    return key;
+  }
+
+  async removeGroceryItem(weekStart: string, key: string) {
+    const { error } = await this.db.from("grocery_items").delete().eq("household_id", this.householdId).eq("week_start", weekStart).eq("item_key", key);
+    if (error) fail("remove grocery item", error);
+  }
+
+  async setIngredientAisle(name: string, aisle: Aisle | null): Promise<number> {
+    const key = matchKey(name);
+    const { data } = await this.db.from("ingredients").select("id, name").eq("household_id", this.householdId);
+    const ids = (data ?? []).filter((i) => matchKey(i.name) === key).map((i) => i.id);
+    if (!ids.length) return 0;
+    const { error } = await this.db.from("ingredients").update({ aisle }).in("id", ids);
+    if (error) fail("set ingredient aisle", error);
+    return ids.length;
   }
 
   async notes(): Promise<ChefNote[]> {

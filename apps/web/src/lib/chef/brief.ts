@@ -134,7 +134,8 @@ export function buildBrief(opts: {
       paragraphs.push(["Next week isn't planned yet. Want me to draft it?"]);
       suggestions.unshift("Plan next week");
     } else if (nextWeek.status === "approved") {
-      paragraphs.push([`Next week is locked in: ${next.length} dinners.`]);
+      paragraphs.push([`Next week is locked in: ${next.length} dinners. Your grocery list is ready when you are.`]);
+      suggestions.unshift("Make my grocery list");
     } else {
       const shared = sharedLeft(next);
       const holiday = holidayWeekName(nextWeek.weekStart);
