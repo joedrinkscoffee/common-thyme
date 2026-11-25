@@ -23,6 +23,10 @@ export async function answerFromLink(token: string): Promise<LinkOutcome> {
     .eq("user_id", claim.userId)
     .maybeSingle();
   if (!member) return { ok: false, error: "This link isn't for your household." };
+  const { data: person } = await admin.auth.admin.getUserById(claim.userId);
+  const email = person?.user?.email?.toLowerCase();
+  const { data: allowed } = email ? await admin.from("app_access").select("email").eq("email", email).maybeSingle() : { data: null };
+  if (!allowed) return { ok: false, error: "Common Thyme is invite-only, and this account isn't on the list." };
 
   const result = await performCheckIn({
     db: admin,

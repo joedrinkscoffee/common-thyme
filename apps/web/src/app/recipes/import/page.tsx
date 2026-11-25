@@ -12,6 +12,7 @@ export const metadata: Metadata = { title: "Import recipes · Common Thyme" };
 async function Gate() {
   const viewer = await getViewer();
   if (viewer.kind === "signed-out") redirect("/login?next=/recipes/import");
+  if (viewer.kind === "no-access") redirect("/invite-only");
   if (viewer.kind === "signed-in" && !viewer.household) redirect("/");
   const untidy = viewer.kind === "signed-in" && viewer.household ? await countUntidyLines(viewer.household.id) : 0;
   return (

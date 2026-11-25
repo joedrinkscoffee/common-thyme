@@ -31,12 +31,16 @@ async function sendEmail(to: string, email: { subject: string; html: string; tex
  */
 export async function runReminders(admin: SupabaseClient, secret: string, now = new Date()): Promise<ReminderReport> {
   const report: ReminderReport = { checked: 0, sent: 0, skipped: 0, errors: [] };
-  const [{ data: settings, error }, { data: members }, { data: profiles }] = await Promise.all([
+  const [{ data: settings, error }, { data: members }, { data: profiles }, { data: access, error: accessError }] = await Promise.all([
     admin.from("household_settings").select("household_id, timezone"),
     admin.from("household_members").select("household_id, user_id"),
     admin.from("profiles").select("id, display_name, timezone"),
+    admin.from("app_access").select("email"),
   ]);
   if (error) throw new Error(`read households: ${error.message}`);
+  // Invite-only: never email someone who has been taken off the access list.
+  if (accessError) throw new Error(`read access list: ${accessError.message}`);
+  const allowed = new Set((access ?? []).map((a) => (a.email as string).toLowerCase()));
   const profileOf = new Map((profiles ?? []).map((p) => [p.id as string, p as { display_name: string | null; timezone: string | null }]));
   const households = (settings ?? []).map((s) => ({
     id: s.household_id as string,
@@ -79,7 +83,7 @@ export async function runReminders(admin: SupabaseClient, secret: string, now = 
 
         const { data: user } = await admin.auth.admin.getUserById(m.user_id);
         const to = user?.user?.email;
-        if (!to) continue;
+        if (!to || !allowed.has(to.toLowerCase())) continue;
         const catalog = await store.catalog();
         const title = (id: string) => catalog.find((r) => r.id === id)?.title ?? "A dinner";
         const email = buildReminderEmail({

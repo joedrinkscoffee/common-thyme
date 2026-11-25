@@ -14,6 +14,7 @@ export const metadata: Metadata = { title: "Recipes · Common Thyme" };
 async function Library({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const viewer = await getViewer();
   if (viewer.kind === "signed-out") redirect("/login?next=/recipes");
+  if (viewer.kind === "no-access") redirect("/invite-only");
   if (viewer.kind === "signed-in" && !viewer.household) redirect("/");
 
   const recipes = viewer.kind === "sample" ? sampleRecipes : await listRecipes(viewer.household!.id);

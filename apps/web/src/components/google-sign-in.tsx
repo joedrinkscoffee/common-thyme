@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/safe-next";
 
-export function GoogleSignIn() {
+/** `next` overrides the ?next= on the page, e.g. an invite link's claim step. */
+export function GoogleSignIn({ next }: { next?: string } = {}) {
   const params = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(params.get("error") ? "Sign-in didn't finish. Try again?" : null);
@@ -19,7 +20,7 @@ export function GoogleSignIn() {
     }
     setBusy(true);
     const callback = new URL("/auth/callback", window.location.origin);
-    callback.searchParams.set("next", safeNext(params.get("next")));
+    callback.searchParams.set("next", safeNext(next ?? params.get("next")));
     const { error } = await createClient(url, key).auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: callback.toString() },

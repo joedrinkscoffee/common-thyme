@@ -1,19 +1,27 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseEnv } from "@/lib/supabase/env";
 
 export type Viewer =
   | { kind: "sample" } // Supabase not configured yet
   | { kind: "signed-out" }
+  // Signed in with Google, but not invited: sees the invite-only page.
+  | { kind: "no-access"; userId: string; firstName: string | null; email: string | null }
   | {
       kind: "signed-in";
       userId: string;
       firstName: string | null;
+      /** Runs the app: can make invite links. */
+      isOwner: boolean;
       household: { id: string; name: string; memberCount: number } | null;
     };
 
-/** Who is looking at the page, and which household they belong to. */
-export async function getViewer(): Promise<Viewer> {
+/**
+ * Who is looking at the page, whether they're invited, and which household
+ * they belong to. Cached for the request, so the header and page share it.
+ */
+export const getViewer = cache(async function getViewer(): Promise<Viewer> {
   if (!supabaseEnv()) return { kind: "sample" };
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -25,15 +33,23 @@ export async function getViewer(): Promise<Viewer> {
   const firstName = fullName ? fullName.split(" ")[0] : null;
 
   // v1: one household per person.
-  const { data: membership } = await supabase
-    .from("household_members")
-    .select("household_id, households(name)")
-    .eq("user_id", claims.sub)
-    .order("joined_at")
-    .limit(1)
-    .maybeSingle();
+  const [{ data: access }, { data: membership }] = await Promise.all([
+    supabase.rpc("my_app_access"),
+    supabase
+      .from("household_members")
+      .select("household_id, households(name)")
+      .eq("user_id", claims.sub)
+      .order("joined_at")
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  if (!membership) return { kind: "signed-in", userId: claims.sub, firstName, household: null };
+  // The database enforces this too; this only picks the page to show.
+  if (access !== "owner" && access !== "allowed") {
+    return { kind: "no-access", userId: claims.sub, firstName, email: typeof claims.email === "string" ? claims.email : null };
+  }
+  const isOwner = access === "owner";
+  if (!membership) return { kind: "signed-in", userId: claims.sub, firstName, isOwner, household: null };
 
   const { count } = await supabase
     .from("household_members")
@@ -47,6 +63,7 @@ export async function getViewer(): Promise<Viewer> {
     kind: "signed-in",
     userId: claims.sub,
     firstName,
+    isOwner,
     household: { id: membership.household_id, name: name ?? "Your household", memberCount: count ?? 1 },
   };
-}
+});

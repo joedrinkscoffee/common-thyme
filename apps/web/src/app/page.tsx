@@ -36,6 +36,7 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ day?: str
     return <Home data={await sampleHome(day)} statusLabel="Sample week · not connected yet" sample />;
   }
   if (viewer.kind === "signed-out") redirect("/login");
+  if (viewer.kind === "no-access") redirect("/invite-only");
   if (!viewer.household) return <CreateHousehold firstName={viewer.firstName} />;
 
   const data = await loadChefHome({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });

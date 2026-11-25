@@ -14,6 +14,7 @@ export const metadata: Metadata = { title: "Tags · Common Thyme" };
 async function Tags() {
   const viewer = await getViewer();
   if (viewer.kind === "signed-out") redirect("/login?next=/recipes/tags");
+  if (viewer.kind === "no-access") redirect("/invite-only");
   if (viewer.kind === "signed-in" && !viewer.household) redirect("/");
   const tags =
     viewer.kind === "sample"

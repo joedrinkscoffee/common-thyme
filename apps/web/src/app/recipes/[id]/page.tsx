@@ -53,6 +53,7 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const viewer = await getViewer();
   if (viewer.kind === "signed-out") redirect(`/login?next=/recipes/${id}`);
+  if (viewer.kind === "no-access") redirect("/invite-only");
   const recipe = viewer.kind === "sample" ? sampleRecipes.find((r) => r.id === id) : await getRecipe(id);
   if (!recipe) notFound();
   const household = viewer.kind === "signed-in" ? viewer.household : null;
