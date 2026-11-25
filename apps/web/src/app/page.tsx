@@ -6,6 +6,7 @@ import { InvitePartner } from "@/components/invite-partner";
 import { SiteHeader } from "@/components/site-header";
 import { WeekBoard } from "@/components/week-board";
 import { TimezoneSync } from "@/components/timezone-sync";
+import { ChefHomeSkeleton } from "@/components/skeletons";
 import { getViewer } from "@/lib/household";
 import { loadChefHome } from "@/lib/chef/server";
 import { sampleHome } from "@/lib/chef/sample-home";
@@ -49,19 +50,11 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ day?: str
   );
 }
 
-function HomeLoading() {
-  return (
-    <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 sm:px-6" aria-busy="true">
-      <p className="text-muted">Chef is getting your week…</p>
-    </main>
-  );
-}
-
 export default function Page({ searchParams }: PageProps<"/">) {
   return (
     <>
       <SiteHeader />
-      <Suspense fallback={<HomeLoading />}>
+      <Suspense fallback={<ChefHomeSkeleton />}>
         <HomeContent searchParams={searchParams as Promise<{ day?: string }>} />
       </Suspense>
     </>

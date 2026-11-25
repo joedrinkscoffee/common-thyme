@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { RecipePhotoButton } from "@/components/recipe-photo-button";
 import { SiteHeader } from "@/components/site-header";
+import { RecipeSkeleton } from "@/components/skeletons";
 import { getViewer } from "@/lib/household";
 import { IngredientText } from "@/components/ingredient-text";
 import { countUpcomingDinners, getRecipe, listIngredientNames, listTags, type RecipeDetail } from "@/lib/recipes";
@@ -151,7 +152,7 @@ export default function RecipePage(props: PageProps<"/recipes/[id]">) {
         <Link href="/recipes" className="mb-4 mt-2 inline-block text-sm font-semibold text-ink">
           ← All recipes
         </Link>
-        <Suspense fallback={<p className="text-muted">Getting the recipe…</p>}>
+        <Suspense fallback={<RecipeSkeleton />}>
           <Recipe params={props.params} />
         </Suspense>
       </main>

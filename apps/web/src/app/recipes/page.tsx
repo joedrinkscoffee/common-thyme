@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { RecipeLibrary } from "@/components/recipe-library";
 import { SiteHeader } from "@/components/site-header";
+import { RecipeLibrarySkeleton } from "@/components/skeletons";
 import { getViewer } from "@/lib/household";
 import { DeletedSticker } from "@/components/deleted-sticker";
 import { getDeletedTitle, listRecipes } from "@/lib/recipes";
@@ -59,7 +60,7 @@ export default function RecipesPage(props: PageProps<"/recipes">) {
             </Link>
           </div>
         </div>
-        <Suspense fallback={<p className="text-muted">Getting your recipes…</p>}>
+        <Suspense fallback={<RecipeLibrarySkeleton />}>
           <Library searchParams={props.searchParams} />
         </Suspense>
       </main>
