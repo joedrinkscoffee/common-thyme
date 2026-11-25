@@ -95,7 +95,7 @@ export default function WhatChefKnows({ searchParams }: PageProps<"/what-chef-kn
       <SiteHeader active="knows" />
       <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 pb-10 sm:px-6">
         <h1 className="mb-1 mt-2 font-display text-4xl font-extrabold tracking-tight">What Chef knows</h1>
-        <p className="mb-6 mt-0 text-muted">Chef uses these when it plans your week. Change anything here, or forget what&apos;s no longer true.</p>
+        <p className="mb-6 mt-0 text-muted">Chef uses these when it plans your week. Forget anything that&apos;s no longer true.</p>
         <Suspense fallback={<p className="text-muted">Loading…</p>}>
           <NotesFor searchParams={searchParams as Promise<{ calendar?: string }>} />
         </Suspense>
