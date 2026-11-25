@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getViewer } from "@/lib/household";
+import { chefDailyLimit } from "@/lib/admin";
 import { PHOTO_TYPES } from "@/lib/recipe-photo";
 import { runChef, type HistoryItem } from "@/lib/chef/agent";
 import { ChefSession, type Attachment } from "@/lib/chef/session";
@@ -11,8 +12,6 @@ export const maxDuration = 300;
 
 const MAX_TEXT = 4000;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
-// A ceiling on what one household can spend in a day, whatever happens.
-const DAILY_TURNS = 80;
 
 
 const json = (body: ChefTurnResponse, status = 200) => Response.json(body, { status });
@@ -48,13 +47,17 @@ export async function POST(request: Request) {
   const household = viewer.household;
   const { db, store, today, settings } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household });
 
-  const { count } = await db
-    .from("chef_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("household_id", household.id)
-    .eq("role", "user")
-    .gte("created_at", new Date(Date.now() - 86_400_000).toISOString());
-  if ((count ?? 0) >= DAILY_TURNS) return json({ ok: false, error: "That's a lot of chat for one day. Let's pick this up tomorrow." }, 429);
+  // A ceiling on what one household can spend in a day. Admins set it.
+  const [{ count }, dailyLimit] = await Promise.all([
+    db
+      .from("chef_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("household_id", household.id)
+      .eq("role", "user")
+      .gte("created_at", new Date(Date.now() - 86_400_000).toISOString()),
+    chefDailyLimit(),
+  ]);
+  if ((count ?? 0) >= dailyLimit) return json({ ok: false, error: "That's a lot of chat for one day. Let's pick this up tomorrow." }, 429);
 
   const earlier = await loadMessages(db, household.id, { limit: 16 });
   const history: HistoryItem[] = earlier.map((m) => ({ role: m.role, author: m.author, body: m.body }));

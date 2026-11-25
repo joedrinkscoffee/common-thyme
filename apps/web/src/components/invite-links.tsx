@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createAccessLink, removeAccess, revokeAccessLink } from "@/app/invites/actions";
+import { createAccessLink, removeAccess, revokeAccessLink } from "@/app/admin/actions";
 import type { LinkState } from "@/lib/access-links";
 
 export type LinkRow = { id: string; url: string; label: string | null; maxUses: number; useCount: number; expiresAt: string; state: LinkState };
