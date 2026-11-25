@@ -12,39 +12,49 @@ function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: s
   // Dinners this week (or earlier) can be marked; later weeks haven't happened yet.
   const markable = weekStartOf(dinner.date) <= weekStartOf(today) && dinner.status !== "moved";
   return (
-    <div className="flex flex-col">
-    <MealPreviewLink
-      dinner={dinner}
-      className="group block overflow-hidden rounded-2xl border-2 border-ink bg-paper text-ink no-underline transition-[translate,box-shadow] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-pop motion-reduce:transition-none"
-    >
-      <div className={`relative aspect-square ${skipped ? "opacity-45 grayscale" : ""}`} style={{ background: TINTS[i % TINTS.length] }}>
-        {dinner.photoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element -- signed URLs from a private bucket
-          <img src={dinner.photoUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-        )}
-        <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${tonight ? "bg-tomato text-white" : "bg-ink text-cream"}`}>
-          {tonight && dinner.meal === "dinner" ? "TONIGHT" : dayName(dinner.date, "short").toUpperCase()}
-        </span>
-        {dinner.meal !== "dinner" && (
-          <span className="absolute left-2 top-8 rounded-full border-[1.5px] border-ink bg-cream px-2 py-0.5 text-[11px] font-extrabold">{dinner.meal}</span>
-        )}
-        {dinner.sharedWithKids && (
-          <span className="absolute right-2 top-2 rotate-3 rounded-full border-[1.5px] border-ink bg-lemon px-2 py-0.5 text-[11px] font-extrabold">
-            +kids
-          </span>
-        )}
-        {done && (
-          <span className="absolute bottom-2 left-2 -rotate-3 rounded-full border-[1.5px] border-ink bg-caper px-2 py-0.5 text-[11px] font-extrabold">
-            ✓ cooked
-          </span>
-        )}
-      </div>
-      <div className="px-2.5 pb-2.5 pt-2">
-        <div className={`font-display text-sm font-bold leading-tight group-hover:underline ${skipped ? "text-muted line-through" : ""}`}>{dinner.title}</div>
-        {skipped && <div className="mt-0.5 text-[12px] text-muted">Skipped</div>}
-      </div>
-    </MealPreviewLink>
-    {markable && <DinnerMark dinnerId={dinner.id} status={dinner.status as "planned" | "cooked" | "skipped"} title={dinner.title} sample={sample} />}
+    // One bordered card per meal: photo, a title clamped to two lines, and the Cooked
+    // mark in a footer, so every card in a row is the same height and buttons line up.
+    <div className="group flex h-full flex-col overflow-hidden rounded-2xl border-2 border-ink bg-paper text-ink transition-[translate,box-shadow] has-[a:hover]:-translate-x-0.5 has-[a:hover]:-translate-y-0.5 has-[a:hover]:shadow-pop motion-reduce:transition-none">
+      <MealPreviewLink dinner={dinner} className="flex flex-1 flex-col text-ink no-underline">
+        <div className={`relative aspect-square ${skipped ? "opacity-45 grayscale" : ""}`} style={{ background: TINTS[i % TINTS.length] }}>
+          {dinner.photoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- signed URLs from a private bucket
+            <img src={dinner.photoUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          )}
+          {/* Stickers wrap instead of overlapping on narrow phone cards. */}
+          <div className="absolute inset-x-2 top-2 flex flex-wrap items-start gap-1">
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tonight ? "bg-tomato text-white" : "bg-ink text-cream"}`}>
+              {tonight && dinner.meal === "dinner" ? "TONIGHT" : dayName(dinner.date, "short").toUpperCase()}
+            </span>
+            {dinner.sharedWithKids && (
+              <span className="rotate-3 rounded-full border-[1.5px] border-ink bg-lemon px-2 py-0.5 text-[11px] font-extrabold">+kids</span>
+            )}
+            {dinner.meal !== "dinner" && (
+              <span className="rounded-full border-[1.5px] border-ink bg-cream px-2 py-0.5 text-[11px] font-extrabold">{dinner.meal}</span>
+            )}
+          </div>
+          {done && (
+            <span className="absolute bottom-2 left-2 -rotate-3 rounded-full border-[1.5px] border-ink bg-caper px-2 py-0.5 text-[11px] font-extrabold">
+              ✓ cooked
+            </span>
+          )}
+        </div>
+        <div className="flex-1 px-2.5 pb-2 pt-2">
+          {/* Always two lines tall; longer names end in an ellipsis (full name on hover and in the preview). */}
+          <div
+            title={dinner.title}
+            className={`line-clamp-2 min-h-[2.5em] break-words font-display text-sm font-bold leading-tight group-has-[a:hover]:underline ${skipped ? "text-muted line-through" : ""}`}
+          >
+            {dinner.title}
+          </div>
+          {skipped && <div className="mt-0.5 text-[12px] text-muted">Skipped</div>}
+        </div>
+      </MealPreviewLink>
+      {markable && (
+        <div className="px-2 pb-2">
+          <DinnerMark dinnerId={dinner.id} status={dinner.status as "planned" | "cooked" | "skipped"} title={dinner.title} sample={sample} />
+        </div>
+      )}
     </div>
   );
 }

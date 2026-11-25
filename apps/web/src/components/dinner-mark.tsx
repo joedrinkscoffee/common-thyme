@@ -4,9 +4,9 @@ import { useState, useTransition } from "react";
 import { checkInDinner } from "@/app/chef-actions";
 
 const small =
-  "min-h-8 rounded-full border-[1.5px] border-ink px-2.5 text-[12px] font-bold transition-colors hover:bg-lemon disabled:cursor-wait disabled:opacity-60";
+  "min-h-8 w-full whitespace-nowrap rounded-full border-[1.5px] border-ink px-1.5 text-[12px] font-bold transition-colors hover:bg-lemon disabled:cursor-wait disabled:opacity-60";
 
-/** The Cooked mark under a dinner tile, and its Undo. */
+/** The Cooked mark in a dinner card's footer, and its Undo. */
 export function DinnerMark({ dinnerId, status, title, sample = false }: { dinnerId: string; status: "planned" | "cooked" | "skipped"; title: string; sample?: boolean }) {
   const [busy, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function DinnerMark({ dinnerId, status, title, sample = false }: { dinner
     });
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-col gap-1">
       {shown === "planned" ? (
         <button type="button" disabled={busy} onClick={() => act("cooked", "cooked")} className={`${small} bg-paper`} aria-label={`Mark ${title} cooked`}>
           Mark cooked
