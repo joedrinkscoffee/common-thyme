@@ -406,3 +406,64 @@ test("everyone reads the daily Chef limit, only admins change it", async () => {
   await assert.rejects(as(JOE, "update public.app_settings set chef_daily_limit = 0"), /check constraint/);
   await assert.rejects(as(STRANGER, "insert into public.app_settings (id) values (true)"), /permission denied/);
 });
+
+async function homeWithPartner(as) {
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  await as(JOE, `insert into public.recipes (household_id, title) values ('${household}', 'Feta & Olive Pizza')`);
+  const [{ token }] = await as(JOE, `insert into public.household_invites (household_id) values ('${household}') returning token`);
+  await as(PARTNER, `select public.accept_household_invite('${token}')`);
+  return household;
+}
+
+test("each person can turn their check-in emails off, and only their own", async () => {
+  const { as } = await setup();
+  await homeWithPartner(as);
+  const [mine] = await as(PARTNER, `select checkin_thursday, checkin_sunday from public.profiles where id = '${PARTNER}'`);
+  assert.deepEqual(mine, { checkin_thursday: true, checkin_sunday: true });
+  await as(PARTNER, `update public.profiles set checkin_sunday = false where id = '${PARTNER}'`);
+  await as(PARTNER, `update public.profiles set checkin_sunday = false where id = '${JOE}'`);
+  const rows = await as(JOE, `select id, checkin_sunday from public.profiles order by id`);
+  assert.deepEqual(rows.map((r) => r.checkin_sunday), [true, false]);
+});
+
+test("only the owner removes someone, and leaving hands the household on", async () => {
+  const { as } = await setup();
+  const household = await homeWithPartner(as);
+  await assert.rejects(as(PARTNER, `select public.remove_household_member('${JOE}')`), /only the household owner/);
+  await assert.rejects(as(STRANGER, `select public.remove_household_member('${PARTNER}')`), /only the household owner/);
+  await as(JOE, `select public.remove_household_member('${PARTNER}')`);
+  assert.equal((await as(PARTNER, "select count(*)::int as n from public.recipes"))[0].n, 0);
+
+  // Joe invites them back, then leaves: the partner becomes owner and keeps the recipes.
+  const [{ token }] = await as(JOE, `insert into public.household_invites (household_id) values ('${household}') returning token`);
+  await as(PARTNER, `select public.accept_household_invite('${token}')`);
+  await as(JOE, `select public.leave_household()`);
+  const [left] = await as(PARTNER, `select user_id, role from public.household_members`);
+  assert.deepEqual(left, { user_id: PARTNER, role: "owner" });
+  assert.equal((await as(PARTNER, "select count(*)::int as n from public.recipes"))[0].n, 1);
+  // The last person can't leave (they delete their account instead).
+  await assert.rejects(as(PARTNER, `select public.leave_household()`), /last_member/);
+});
+
+test("deleting your account keeps the household for a partner, or deletes it when you're alone", async () => {
+  const { db, as } = await setup();
+  const household = await homeWithPartner(as);
+  // Admins can't delete themselves from the app.
+  await assert.rejects(as(JOE, `select public.delete_my_account()`), /admin_cannot_delete/);
+  await db.exec(`reset role; delete from public.app_admins`);
+
+  const [{ outcome }] = await as(JOE, `select public.delete_my_account() as outcome`);
+  assert.equal(outcome, "household_kept");
+  await db.exec("reset role");
+  assert.equal((await db.query(`select count(*)::int as n from auth.users where id = '${JOE}'`)).rows[0].n, 0);
+  assert.equal((await db.query(`select count(*)::int as n from public.app_access where email = 'joe@example.com'`)).rows[0].n, 0);
+  const [owner] = await as(PARTNER, `select user_id, role from public.household_members`);
+  assert.deepEqual(owner, { user_id: PARTNER, role: "owner" });
+  assert.equal((await as(PARTNER, "select count(*)::int as n from public.recipes"))[0].n, 1);
+
+  const [{ outcome: last }] = await as(PARTNER, `select public.delete_my_account() as outcome`);
+  assert.equal(last, "household_deleted");
+  await db.exec("reset role");
+  assert.equal((await db.query(`select count(*)::int as n from public.households where id = '${household}'`)).rows[0].n, 0);
+  assert.equal((await db.query(`select count(*)::int as n from public.recipes`)).rows[0].n, 0);
+});

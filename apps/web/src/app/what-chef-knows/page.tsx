@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { getViewer } from "@/lib/household";
 import { calendarLink, chefContext, loadCalendarNights } from "@/lib/chef/server";
-import { CalendarLink, type CalendarNightView } from "@/components/calendar-link";
+import Link from "next/link";
+import type { CalendarNightView } from "@/components/calendar-link";
 import { dayName, shortDate } from "@/lib/chef/dates";
 import type { CalendarNight } from "@/lib/chef/calendar";
 import type { ChefNote } from "@/lib/chef/store";
@@ -45,6 +46,42 @@ function NoteList({ title, hint, notes, sample }: { title: string; hint: string;
   );
 }
 
+/** What Chef sees on the calendar. Linking and unlinking it lives in Settings. */
+function CalendarSummary({ linked, error, nights }: { linked: boolean; error: string | null; nights: CalendarNightView[] }) {
+  const settings = (
+    <Link href="/settings/planning" className="font-semibold text-tomato-dark">
+      {linked ? "Change it in Settings" : "Link one in Settings"}
+    </Link>
+  );
+  return (
+    <section className="rounded-[24px] border-2 border-ink bg-paper p-5 sm:p-6">
+      <h2 className="m-0 font-display text-xl font-extrabold">Your calendar</h2>
+      {!linked ? (
+        <p className="mb-0 mt-1 text-[15px] text-muted">No calendar linked, so Chef doesn&apos;t know about busy evenings or trips. {settings}.</p>
+      ) : error ? (
+        <p className="mb-0 mt-1 text-[15px] text-tomato-dark">Last time Chef couldn&apos;t read it: {error}. {settings}.</p>
+      ) : (
+        <>
+          <p className="mb-3 mt-1 text-[15px] text-muted">Busy evenings get a quick dinner and travel nights stay open. {settings}.</p>
+          {nights.length ? (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {nights.map((n) => (
+                <li key={n.date} className="flex flex-wrap items-center gap-2 rounded-2xl bg-sand px-4 py-2.5">
+                  <span className="rounded-full border-[1.5px] border-ink bg-lemon px-2 py-0.5 text-[11px] font-extrabold">{n.kind === "away" ? "away" : "quick dinner"}</span>
+                  <span className="font-semibold">{n.label}</span>
+                  <span className="text-muted">{n.titles.join(", ")}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="m-0 text-muted">Nothing in the next few weeks changes dinner.</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 const SAMPLE_NIGHTS: CalendarNight[] = [
   { date: "2026-11-24", kind: "busy", titles: ["Soccer practice at 5:30 PM"] },
   { date: "2026-12-02", kind: "away", titles: ["Flight to Denver"] },
@@ -70,7 +107,7 @@ async function Notes({ sampleCalendar }: { sampleCalendar: boolean }) {
   return (
     <div className="grid gap-5 md:grid-cols-2">
       <div className="md:col-span-2">
-        <CalendarLink linked={calendar.linked} error={calendar.error} nights={calendar.nights.map(nightView)} sample={sample} />
+        <CalendarSummary linked={calendar.linked} error={calendar.error} nights={calendar.nights.map(nightView)} />
       </div>
       <NoteList title="You said" hint="Things you told Chef. Tell Chef in the chat to add more." notes={notes.filter((n) => n.source === "you_said")} sample={sample} />
       <NoteList title="Chef noticed" hint="Patterns Chef picked up from how your weeks went." notes={notes.filter((n) => n.source === "learned")} sample={sample} />
