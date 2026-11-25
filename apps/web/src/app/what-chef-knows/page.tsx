@@ -8,15 +8,18 @@ import { CalendarLink, type CalendarNightView } from "@/components/calendar-link
 import { dayName, shortDate } from "@/lib/chef/dates";
 import type { CalendarNight } from "@/lib/chef/calendar";
 import type { ChefNote } from "@/lib/chef/store";
-import { forgetNote } from "./actions";
+import { forgetNote, type PlanningInput } from "./actions";
+import { DEFAULT_SETTINGS } from "@/lib/chef/store";
+import { FoodPreferences, HowChefPlans } from "@/components/chef-preferences";
 
 const SAMPLE: ChefNote[] = [
   { id: "1", source: "you_said", category: "tastes", body: "No mushrooms for Joe's partner." },
   { id: "2", source: "you_said", category: "habits", body: "Friday is usually pizza night." },
   { id: "3", source: "learned", category: "habits", body: "Fish dinners get skipped more than others." },
+  { id: "4", source: "you_said", category: "tastes", body: "Mostly vegetarian on weeknights." },
 ];
 
-function NoteList({ title, hint, notes, sample }: { title: string; hint: string; notes: ChefNote[]; sample: boolean }) {
+function NoteList({ title, hint, empty, notes, sample }: { title: string; hint: string; empty: string; notes: ChefNote[]; sample: boolean }) {
   return (
     <section className="rounded-[24px] border-2 border-ink bg-paper p-5 sm:p-6">
       <h2 className="m-0 font-display text-xl font-extrabold">{title}</h2>
@@ -40,11 +43,14 @@ function NoteList({ title, hint, notes, sample }: { title: string; hint: string;
           ))}
         </ul>
       ) : (
-        <p className="m-0 text-muted">Nothing yet.</p>
+        <p className="m-0 rounded-2xl border-2 border-dashed border-dash px-4 py-3 text-[15px] text-muted">{empty}</p>
       )}
     </section>
   );
 }
+
+/** Food preferences are the tastes you told Chef; they get their own card. */
+const isPreference = (n: ChefNote) => n.source === "you_said" && n.category === "tastes";
 
 const SAMPLE_NIGHTS: CalendarNight[] = [
   { date: "2026-11-24", kind: "busy", titles: ["Soccer practice at 5:30 PM"] },
@@ -58,6 +64,7 @@ async function Notes({ sampleCalendar }: { sampleCalendar: boolean }) {
   if (viewer.kind === "signed-out") redirect("/login");
   if (viewer.kind === "no-access") redirect("/invite-only");
   let notes = SAMPLE;
+  let s = DEFAULT_SETTINGS;
   const sample = viewer.kind === "sample";
   let calendar = { linked: sampleCalendar, error: null as string | null, nights: sampleCalendar ? SAMPLE_NIGHTS : [] };
   if (viewer.kind === "signed-in") {
@@ -65,16 +72,20 @@ async function Notes({ sampleCalendar }: { sampleCalendar: boolean }) {
     const { store, db, settings, today } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
     const [n, nights] = await Promise.all([store.notes(), loadCalendarNights(db, viewer.household.id, settings.timezone, today)]);
     notes = n;
+    s = settings;
     const link = nights === null ? null : await calendarLink(db, viewer.household.id);
     calendar = { linked: !!link, error: link?.lastError ?? null, nights: (nights ?? []).slice(0, 8) };
   }
+  const planning: PlanningInput = { mealsPerWeek: s.dinnersPerWeek, baseServings: s.baseServings, kidsExtraServings: s.kidsExtraServings, noRepeatWeeks: s.noRepeatWeeks };
   return (
     <div className="grid gap-5 md:grid-cols-2">
+      <HowChefPlans initial={planning} sample={sample} />
+      <FoodPreferences initial={notes.filter(isPreference).map((n) => ({ id: n.id, body: n.body }))} sample={sample} />
       <div className="md:col-span-2">
         <CalendarLink linked={calendar.linked} error={calendar.error} nights={calendar.nights.map(nightView)} sample={sample} />
       </div>
-      <NoteList title="You said" hint="Things you told Chef. Tell Chef in the chat to add more." notes={notes.filter((n) => n.source === "you_said")} sample={sample} />
-      <NoteList title="Chef noticed" hint="Patterns Chef picked up from how your weeks went." notes={notes.filter((n) => n.source === "learned")} sample={sample} />
+      <NoteList title="You said" hint="Other things you told Chef. Tell Chef in the chat to add more." empty="Nothing yet. Tell Chef things like who's home on Fridays, and they show up here." notes={notes.filter((n) => n.source === "you_said" && !isPreference(n))} sample={sample} />
+      <NoteList title="Chef noticed" hint="Patterns Chef picked up from how your weeks went." empty="Nothing yet. After a few weeks of check-ins, Chef notes what it learns here." notes={notes.filter((n) => n.source === "learned")} sample={sample} />
     </div>
   );
 }

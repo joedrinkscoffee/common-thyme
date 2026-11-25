@@ -24,6 +24,16 @@ async function sendEmail(to: string, email: { subject: string; html: string; tex
   if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
 
+type ProfileRow = { id: string; display_name: string | null; timezone: string | null; checkin_thursday?: boolean; checkin_sunday?: boolean };
+
+/** Everyone's name, time zone and email switches (the switches only once the settings migration has run). */
+async function readProfiles(admin: SupabaseClient): Promise<{ data: ProfileRow[] }> {
+  const full = await admin.from("profiles").select("id, display_name, timezone, checkin_thursday, checkin_sunday");
+  if (!full.error) return { data: (full.data ?? []) as ProfileRow[] };
+  const basic = await admin.from("profiles").select("id, display_name, timezone");
+  return { data: (basic.data ?? []) as ProfileRow[] };
+}
+
 /**
  * Runs every hour. For each person in each household, works out their local
  * time; on Thursday from 7 PM and Sunday from 9 AM it sends that week's
@@ -34,14 +44,14 @@ export async function runReminders(admin: SupabaseClient, secret: string, now = 
   const [{ data: settings, error }, { data: members }, { data: profiles }, { data: access, error: accessError }] = await Promise.all([
     admin.from("household_settings").select("household_id, timezone"),
     admin.from("household_members").select("household_id, user_id"),
-    admin.from("profiles").select("id, display_name, timezone"),
+    readProfiles(admin),
     admin.from("app_access").select("email"),
   ]);
   if (error) throw new Error(`read households: ${error.message}`);
   // Invite-only: never email someone who has been taken off the access list.
   if (accessError) throw new Error(`read access list: ${accessError.message}`);
   const allowed = new Set((access ?? []).map((a) => (a.email as string).toLowerCase()));
-  const profileOf = new Map((profiles ?? []).map((p) => [p.id as string, p as { display_name: string | null; timezone: string | null }]));
+  const profileOf = new Map(profiles.map((p) => [p.id, p]));
   const households = (settings ?? []).map((s) => ({
     id: s.household_id as string,
     timezone: (s.timezone as string) || "America/New_York",
@@ -57,6 +67,8 @@ export async function runReminders(admin: SupabaseClient, secret: string, now = 
       const tz = profile?.timezone || h.timezone;
       const due = dueReminder(todayIn(tz, now), hourIn(tz, now));
       if (!due) continue;
+      // Turned off in Settings.
+      if ((due.kind === "thursday" && profile?.checkin_thursday === false) || (due.kind === "sunday" && profile?.checkin_sunday === false)) continue;
 
       const { data: already } = await admin
         .from("check_in_emails")

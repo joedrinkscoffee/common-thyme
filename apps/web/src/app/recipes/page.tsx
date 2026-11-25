@@ -52,7 +52,7 @@ export default function RecipesPage(props: PageProps<"/recipes">) {
         <div className="mb-3 mt-4 flex flex-wrap items-end justify-between gap-3">
           <h1 className="m-0 font-display text-4xl font-extrabold leading-none tracking-tight">Recipes</h1>
           <div className="flex gap-2">
-            <Link href="/recipes/tags" className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold text-ink no-underline transition-colors hover:bg-lemon">
+            <Link href="/settings/tags" className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold text-ink no-underline transition-colors hover:bg-lemon">
               Tags
             </Link>
             <Link href="/recipes/import" className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold text-ink no-underline transition-colors hover:bg-lemon">
