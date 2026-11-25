@@ -129,12 +129,14 @@ export function InviteLinks({ links, people }: { links: LinkRow[]; people: Acces
           <button type="submit" disabled={pending} className="min-h-[52px] rounded-full bg-tomato px-6 font-bold text-white hover:bg-tomato-dark disabled:opacity-60">
             {pending ? "Making a link…" : "Make a link"}
           </button>
-          <p role="status" className="m-0 min-h-5 text-sm text-tomato-dark">
-            {error}
-          </p>
+          {error && (
+            <p role="status" className="m-0 text-sm text-tomato-dark">
+              {error}
+            </p>
+          )}
         </form>
         {made && (
-          <div className="flex flex-col gap-3 rounded-2xl border-2 border-dashed border-ink bg-cream p-4">
+          <div className="mt-4 flex flex-col gap-3 rounded-2xl border-2 border-dashed border-ink bg-cream p-4">
             <div className="text-sm font-semibold">Your link is ready. Send it to them:</div>
             <input
               readOnly
@@ -187,8 +189,8 @@ export function InviteLinks({ links, people }: { links: LinkRow[]; people: Acces
         <p className="mb-3 mt-0 text-sm text-muted">Removing someone keeps their recipes and plans, but they can&apos;t open the app until they&apos;re invited again.</p>
         <ul className="m-0 flex list-none flex-col divide-y-2 divide-line rounded-2xl border-2 border-ink bg-paper p-0">
           {people.map((p) => (
-            <li key={p.email} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-              <div className="min-w-0">
+            <li key={p.email} className="flex items-center justify-between gap-2 px-4 py-3">
+              <div className="min-w-0 flex-1">
                 <div className="break-all font-semibold">
                   {p.email}
                   {p.isYou && <span className="font-normal text-muted"> (you)</span>}
@@ -199,7 +201,7 @@ export function InviteLinks({ links, people }: { links: LinkRow[]; people: Acces
               </div>
               {!p.isYou &&
                 (confirming === p.email ? (
-                  <div className="flex gap-1">
+                  <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
                       onClick={() => start(async () => {
@@ -215,7 +217,7 @@ export function InviteLinks({ links, people }: { links: LinkRow[]; people: Acces
                     </button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setConfirming(p.email)} className="min-h-[40px] rounded-full px-4 text-sm font-semibold text-muted hover:bg-lemon hover:text-ink">
+                  <button type="button" onClick={() => setConfirming(p.email)} className="min-h-[40px] shrink-0 rounded-full px-3 text-sm font-semibold text-muted hover:bg-lemon hover:text-ink">
                     Remove…
                   </button>
                 ))}
