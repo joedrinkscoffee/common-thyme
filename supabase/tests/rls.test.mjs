@@ -339,3 +339,31 @@ test("everyone already signed up keeps access, and the first one is the owner", 
   const { rows: owners } = await db.query("select user_id from public.app_owners");
   assert.deepEqual(owners, [{ user_id: JOE }]);
 });
+
+test("meals and ingredient lines can't point at another household's rows", async () => {
+  const { as } = await setup();
+  const [{ id: mine }] = await as(JOE, `select public.create_household('Home') as id`);
+  const [{ id: theirs }] = await as(STRANGER, `select public.create_household('Other') as id`);
+  const [myRecipe] = await as(JOE, `insert into public.recipes (household_id, title) values ('${mine}', 'Tacos') returning id`);
+  const [myPlan] = await as(JOE, `insert into public.meal_plans (household_id, week_start) values ('${mine}', '2026-11-30') returning id`);
+  const [theirRecipe] = await as(STRANGER, `insert into public.recipes (household_id, title) values ('${theirs}', 'Secret stew') returning id`);
+  const [theirPlan] = await as(STRANGER, `insert into public.meal_plans (household_id, week_start) values ('${theirs}', '2026-11-30') returning id`);
+  const [theirIngredient] = await as(STRANGER, `insert into public.ingredients (household_id, name) values ('${theirs}', 'saffron') returning id`);
+  const dinner = (plan, recipe) =>
+    `insert into public.planned_dinners (plan_id, household_id, recipe_id, date, servings) values ('${plan}', '${mine}', '${recipe}', '2026-12-01', 2) returning id`;
+
+  await assert.rejects(as(JOE, dinner(myPlan.id, theirRecipe.id)), /other_household/);
+  await assert.rejects(as(JOE, dinner(theirPlan.id, myRecipe.id)), /other_household/);
+  const [ok] = await as(JOE, dinner(myPlan.id, myRecipe.id));
+  await assert.rejects(as(JOE, `update public.planned_dinners set recipe_id = '${theirRecipe.id}' where id = '${ok.id}'`), /other_household/);
+  // Updates that don't touch the links still work.
+  await as(JOE, `update public.planned_dinners set status = 'cooked' where id = '${ok.id}'`);
+
+  await assert.rejects(
+    as(JOE, `insert into public.recipe_ingredients (recipe_id, ingredient_id, position, raw_text) values ('${myRecipe.id}', '${theirIngredient.id}', 0, 'a pinch')`),
+    /other_household/,
+  );
+  await as(JOE, `insert into public.recipe_ingredients (recipe_id, ingredient_id, position, raw_text) values ('${myRecipe.id}', null, 0, 'salt')`);
+  // The other household can still erase its recipe.
+  await as(STRANGER, `delete from public.recipes where id = '${theirRecipe.id}'`);
+});
