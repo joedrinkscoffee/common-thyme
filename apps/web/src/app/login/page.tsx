@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Sign in · Common Thyme" };
 export default function LoginPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-6">
-      <div className="font-display text-lg font-extrabold">
+      <div className="font-brand text-lg font-normal">
         Common <span className="text-tomato">Thyme</span>
       </div>
       <div className="mx-auto mt-6 w-full max-w-[350px]">

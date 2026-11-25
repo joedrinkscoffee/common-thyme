@@ -3,15 +3,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { shortDate } from "@/lib/chef/dates";
+import { dayName, shortDate } from "@/lib/chef/dates";
 import { ChefAvatar } from "./chef-avatar";
+import { ProduceSticker } from "./produce-sticker";
 import type { Brief, Segment } from "@/lib/chef/brief";
 import type { ChefTurnResponse, HomeMessage } from "@/lib/chef/home";
 import { checkInDinner } from "@/app/chef-actions";
 import type { CheckInAction } from "@/lib/chef/check-in";
 import { photoForClaude } from "@/lib/shrink-photo";
 
-const STICKERS = ["bg-lemon", "bg-caper", "bg-kale"];
 /** The chat box grows with the text up to this height (about 7 lines), then scrolls. */
 const INPUT_MAX_HEIGHT = 196;
 const NOT_CONNECTED = "I'm not hooked up yet, so I can't act on that. Once the Anthropic key is in, I'll change the week right here.";
@@ -19,17 +19,12 @@ const NOT_CONNECTED = "I'm not hooked up yet, so I can't act on that. Once the A
 type Photo = { data: string; type: string; preview: string };
 
 function Paragraph({ segments }: { segments: Segment[] }) {
-  let sticker = 0;
   return (
     <p className="m-0">
       {segments.map((s, i) => {
         if (typeof s === "string") return <span key={i}>{s}</span>;
         if ("bold" in s) return <strong key={i}>{s.bold}</strong>;
-        return (
-          <span key={i} className={`${STICKERS[sticker++ % STICKERS.length]} rounded-[5px] px-1.5 font-semibold`}>
-            {s.sticker}
-          </span>
-        );
+        return <ProduceSticker key={i} name={s.sticker} note={`×${s.count}`} className="mx-0.5 text-[15px]" />;
       })}
     </p>
   );
@@ -71,8 +66,9 @@ function GroceryLink({ weekStart }: { weekStart: string }) {
   );
 }
 
+// Suggestions are quiet (a soft edge); answers to Chef's questions keep the ink border.
 const chip =
-  "min-h-9 rounded-full border-2 border-ink bg-paper px-3.5 text-sm font-semibold transition-colors hover:bg-lemon disabled:cursor-wait disabled:opacity-60";
+  "min-h-9 rounded-full border-[1.5px] border-ink/30 bg-paper px-3.5 text-sm font-semibold transition-colors hover:border-ink hover:bg-lemon disabled:cursor-wait disabled:opacity-60";
 const bigChip =
   "min-h-11 rounded-full border-2 border-ink bg-paper px-4 font-bold transition-colors hover:bg-lemon disabled:cursor-wait disabled:opacity-60";
 
@@ -87,6 +83,7 @@ export function ChefChat({
   connected,
   firstName,
   statusLabel,
+  today,
   partnerSlot = null,
   sample = false,
 }: {
@@ -95,6 +92,8 @@ export function ChefChat({
   connected: boolean;
   firstName: string | null;
   statusLabel: string;
+  /** Dates Chef's note, like a rubber stamp. */
+  today: string;
   partnerSlot?: ReactNode;
   sample?: boolean;
 }) {
@@ -195,18 +194,22 @@ export function ChefChat({
   return (
     <section
       aria-label="Chat with Chef"
-      className="flex min-w-0 max-w-[720px] flex-[999_1_600px] flex-col overflow-hidden rounded-[28px] border-2 border-ink bg-paper h-[calc(100dvh-9.5rem)] min-h-[480px] sm:h-[calc(100dvh-7rem)] lg:sticky lg:top-4 lg:h-[calc(100dvh-6.5rem)]"
+      className="flex min-w-0 max-w-[720px] flex-[999_1_600px] flex-col overflow-hidden rounded-[28px] border-2 border-crust bg-paper h-[calc(100dvh-9.5rem)] min-h-[480px] sm:h-[calc(100dvh-7rem)] lg:sticky lg:top-4 lg:h-[calc(100dvh-6.5rem)]"
     >
       <header className="flex flex-none items-center gap-3 border-b-2 border-line px-5 py-4 sm:px-6">
         <ChefAvatar size={44} />
         <div>
-          <div className="font-display text-xl font-extrabold leading-tight">Chef</div>
+          <div className="font-brand text-xl font-normal leading-tight">Chef</div>
           <div className="text-[13px] text-muted">{statusLabel}</div>
         </div>
       </header>
 
       <div ref={log} role="log" aria-live="polite" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-3.5 text-[17px] leading-relaxed">
+        {/* Chef's note about the week, pinned at the top of the conversation and dated like a stamp. */}
+        <div className="relative flex flex-col gap-3.5 rounded-[20px] bg-cream px-4 pb-4 pt-9 text-[17px] leading-relaxed sm:px-5">
+          <span className="ink-stamp absolute right-4 top-3 rotate-[5deg] text-tomato/85">
+            {dayName(today, "short")} · {shortDate(today)}
+          </span>
           {brief.paragraphs.map((p, i) => (
             <Paragraph key={i} segments={p} />
           ))}
@@ -351,7 +354,7 @@ export function ChefChat({
             title="Add a photo of a recipe"
             disabled={busy}
             onClick={() => fileInput.current?.click()}
-            className="flex min-h-[52px] w-[52px] flex-none items-center justify-center rounded-full border-2 border-ink bg-paper transition-colors hover:bg-lemon disabled:opacity-60"
+            className="flex min-h-[52px] w-[52px] flex-none items-center justify-center rounded-full border-2 border-crust bg-paper transition-colors hover:border-ink hover:bg-lemon disabled:opacity-60"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
@@ -392,7 +395,7 @@ export function ChefChat({
             placeholder={photo ? "What's this? (optional)" : "Tell Chef what's going on this week…"}
             maxLength={4000}
             style={{ maxHeight: INPUT_MAX_HEIGHT }}
-            className="block min-h-[52px] min-w-0 flex-1 resize-none overflow-y-hidden rounded-[26px] border-2 border-ink bg-paper px-5 py-3 text-base leading-6"
+            className="block min-h-[52px] min-w-0 flex-1 resize-none overflow-y-hidden rounded-[26px] border-2 border-crust bg-paper px-5 py-3 text-base leading-6 focus:border-ink"
           />
           <button
             type="submit"

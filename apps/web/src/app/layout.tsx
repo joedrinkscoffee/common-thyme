@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Inter } from "next/font/google";
+import { Atkinson_Hyperlegible_Next, Bagel_Fat_One } from "next/font/google";
 import "./globals.css";
 
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
+// Bagel Fat One is the wordmark face only (the app name and Chef's name).
+const bagel = Bagel_Fat_One({
+  variable: "--font-bagel",
   subsets: ["latin"],
-  weight: ["500", "700", "800"],
+  weight: "400",
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+// Everything else, headings included: built for legibility, which matters on a phone in a store aisle.
+const atkinson = Atkinson_Hyperlegible_Next({
+  variable: "--font-atkinson",
   subsets: ["latin"],
 });
 
@@ -24,7 +26,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${bagel.variable} ${atkinson.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-cream text-ink">{children}</body>
     </html>
   );

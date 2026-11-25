@@ -29,7 +29,7 @@ export type HomeWeek = {
 };
 
 /** A paragraph: plain text, bold dish names and ingredient stickers. */
-export type Segment = string | { bold: string } | { sticker: string };
+export type Segment = string | { bold: string } | { sticker: string; count: number };
 
 export type Brief = {
   paragraphs: Segment[][];
@@ -38,21 +38,25 @@ export type Brief = {
   suggestions: string[];
 };
 
-function sharedLeft(dinners: HomeDinner[]): { name: string; n: number }[] {
+/** Ingredients more than one of these meals uses up, with how many use each, most-shared first. */
+export function sharedIngredients(dinners: HomeDinner[]): { name: string; n: number }[] {
   const c = new Map<string, number>();
   for (const d of dinners) for (const p of new Set(d.useUp)) c.set(p, (c.get(p) ?? 0) + 1);
   return [...c.entries()]
     .filter(([, n]) => n > 1)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 3)
     .map(([name, n]) => ({ name, n }));
+}
+
+function sharedLeft(dinners: HomeDinner[]): { name: string; n: number }[] {
+  return sharedIngredients(dinners).slice(0, 3);
 }
 
 function stickerList(items: { name: string; n: number }[]): Segment[] {
   const out: Segment[] = [];
   items.forEach((s, i) => {
     if (i > 0) out.push(i === items.length - 1 ? " and " : ", ");
-    out.push({ sticker: `${s.name} × ${s.n}` });
+    out.push({ sticker: s.name, count: s.n });
   });
   return out;
 }

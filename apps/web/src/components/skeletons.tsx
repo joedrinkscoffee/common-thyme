@@ -54,7 +54,7 @@ export function ChefHomeSkeleton() {
         <header className="flex flex-none items-center gap-3 border-b-2 border-line px-5 py-4 sm:px-6">
           <ChefAvatar size={44} />
           <div className="flex flex-col gap-1.5">
-            <div className="font-display text-xl font-extrabold leading-tight">Chef</div>
+            <div className="font-brand text-xl font-normal leading-tight">Chef</div>
             <Bone className="h-3 w-32" />
           </div>
         </header>

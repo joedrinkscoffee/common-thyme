@@ -16,7 +16,7 @@ export default function InvitePage(props: PageProps<"/invite/[token]">) {
       <div className="rounded-[22px] border-2 border-ink bg-paper p-6 shadow-pop-lg">
         <div className="mb-4 flex items-center gap-3">
           <ChefAvatar size={44} />
-          <div className="font-display text-xl font-extrabold">Chef</div>
+          <div className="font-brand text-xl font-normal">Chef</div>
         </div>
         <h1 className="m-0 font-display text-3xl font-extrabold leading-tight">You&apos;re invited to plan dinners together.</h1>
         <p className="mb-6 mt-2 leading-relaxed text-muted">
