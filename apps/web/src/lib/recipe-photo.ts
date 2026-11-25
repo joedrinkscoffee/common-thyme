@@ -16,3 +16,9 @@ export function isPhotoPathFor(path: string, householdId: string, recipeId: stri
   if (!path.startsWith(prefix)) return false;
   return /^(-\d{10,16})?\.(jpg|png|webp|avif|gif)$/.test(path.slice(prefix.length));
 }
+
+/** File extension for a photo's content type, or null when it isn't a photo we keep. */
+export function photoExtension(contentType: string | null): string | null {
+  const type = (contentType ?? "").split(";")[0].trim().toLowerCase();
+  return ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif", "image/gif": "gif" } as Record<string, string>)[type] ?? null;
+}
