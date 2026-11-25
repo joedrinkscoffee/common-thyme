@@ -10,7 +10,7 @@ export type NavItem = { href: string; label: string; active: boolean };
  * floats over the page, so opening it never moves anything. Escape, a tap
  * outside, or picking a page closes it, and focus goes back to the button.
  */
-export function MobileNav({ items, showSignOut }: { items: NavItem[]; showSignOut: boolean }) {
+export function MobileNav({ items, showSignOut, extra = null }: { items: NavItem[]; showSignOut: boolean; extra?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -52,7 +52,7 @@ export function MobileNav({ items, showSignOut }: { items: NavItem[]; showSignOu
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-                onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((o) => !o)}
         className={[
           "relative z-50 flex shrink-0 items-center gap-2 rounded-full border-2 border-ink px-3.5 py-2 font-semibold text-ink",
           "shadow-pop-sm transition-[translate,box-shadow,background-color] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none",
@@ -92,6 +92,7 @@ export function MobileNav({ items, showSignOut }: { items: NavItem[]; showSignOu
                 </Link>
               </li>
             ))}
+            {extra && <li onClick={() => setOpen(false)}>{extra}</li>}
           </ul>
         </nav>
         {showSignOut && (

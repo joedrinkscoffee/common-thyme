@@ -14,6 +14,7 @@ import type { GroceryWeek } from "@/lib/chef/store";
 async function Groceries({ searchParams }: { searchParams: Promise<{ week?: string }> }) {
   const viewer = await getViewer();
   if (viewer.kind === "signed-out") redirect("/login");
+  if (viewer.kind === "no-access") redirect("/invite-only");
   if (viewer.kind === "signed-in" && !viewer.household) redirect("/");
   const { week: param } = await searchParams;
 

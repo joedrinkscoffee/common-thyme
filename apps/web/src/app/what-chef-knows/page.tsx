@@ -55,6 +55,7 @@ const nightView = (n: CalendarNight): CalendarNightView => ({ ...n, label: `${da
 async function Notes({ sampleCalendar }: { sampleCalendar: boolean }) {
   const viewer = await getViewer();
   if (viewer.kind === "signed-out") redirect("/login");
+  if (viewer.kind === "no-access") redirect("/invite-only");
   let notes = SAMPLE;
   const sample = viewer.kind === "sample";
   let calendar = { linked: sampleCalendar, error: null as string | null, nights: sampleCalendar ? SAMPLE_NIGHTS : [] };

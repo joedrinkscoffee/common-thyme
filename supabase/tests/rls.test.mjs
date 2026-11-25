@@ -12,7 +12,7 @@ const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migra
 const SUPABASE_STUBS = `
   create role anon; create role authenticated;
   create schema auth;
-  create table auth.users (id uuid primary key, raw_user_meta_data jsonb);
+  create table auth.users (id uuid primary key, raw_user_meta_data jsonb, email text, created_at timestamptz not null default now());
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   grant usage on schema auth to authenticated;
@@ -26,20 +26,29 @@ const SUPABASE_STUBS = `
 const JOE = "00000000-0000-0000-0000-00000000000a";
 const PARTNER = "00000000-0000-0000-0000-00000000000b";
 const STRANGER = "00000000-0000-0000-0000-00000000000c";
+// Signed in with Google, but not invited.
+const NEWCOMER = "00000000-0000-0000-0000-00000000000d";
+const FRIEND = "00000000-0000-0000-0000-00000000000e";
 
 // One in-memory database at a time: close the last one before starting the next.
 let previous = null;
+
+const migrations = () => readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
 
 async function setup() {
   await previous?.close();
   const db = new PGlite();
   previous = db;
   await db.exec(SUPABASE_STUBS);
-  for (const file of readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort()) {
+  for (const file of migrations()) {
     await db.exec(readFileSync(join(migrationsDir, file), "utf8"));
   }
-  await db.exec(`insert into auth.users values
-    ('${JOE}', '{"full_name":"Joe"}'), ('${PARTNER}', '{"name":"Partner"}'), ('${STRANGER}', '{}')`);
+  await db.exec(`insert into auth.users (id, raw_user_meta_data, email) values
+    ('${JOE}', '{"full_name":"Joe"}', 'joe@example.com'), ('${PARTNER}', '{"name":"Partner"}', 'partner@example.com'),
+    ('${STRANGER}', '{}', 'stranger@example.com'), ('${NEWCOMER}', '{}', 'New.Comer@Example.com'), ('${FRIEND}', '{}', 'friend@example.com')`);
+  // Joe runs the app; the "stranger" is another invited household.
+  await db.exec(`insert into public.app_access (email, via) values ('joe@example.com', 'existing'), ('stranger@example.com', 'existing');
+    insert into public.app_owners (user_id) values ('${JOE}')`);
   const as = async (uid, sql) => {
     await db.exec(`reset role; select set_config('test.uid', '${uid}', false); set role authenticated;`);
     return (await db.query(sql)).rows;
@@ -250,4 +259,111 @@ test("grocery items can be marked as on hand or needed", async () => {
   const rows = await as(JOE, "select item_key, status from public.grocery_items order by item_key");
   assert.deepEqual(rows, [{ item_key: "jasmine rice", status: null }, { item_key: "soy sauce", status: "have" }]);
   await assert.rejects(as(JOE, `update public.grocery_items set status = 'maybe'`), /check constraint/);
+});
+
+test("people who aren't invited can sign in but can't make a household", async () => {
+  const { as } = await setup();
+  assert.equal((await as(NEWCOMER, "select public.my_app_access() as a"))[0].a, null);
+  assert.equal((await as(JOE, "select public.my_app_access() as a"))[0].a, "owner");
+  assert.equal((await as(STRANGER, "select public.my_app_access() as a"))[0].a, "allowed");
+  await assert.rejects(as(NEWCOMER, `select public.create_household('Mine')`), /invite_only/);
+  await assert.rejects(as(NEWCOMER, `insert into public.app_access (email, via) values ('new.comer@example.com', 'link')`), /permission denied/);
+  assert.equal((await as(NEWCOMER, "select count(*)::int as n from public.app_access"))[0].n, 0);
+});
+
+test("an invite link lets new people in until it runs out, expires or is revoked", async () => {
+  const { as } = await setup();
+  const [link] = await as(JOE, `insert into public.access_links (label, max_uses) values ('Book club', 1) returning code, length(code) as len`);
+  assert.equal(link.len, 24);
+
+  // Already in: doesn't use up the link.
+  assert.equal((await as(STRANGER, `select public.redeem_access_link('${link.code}') as r`))[0].r, "already");
+  assert.equal((await as(NEWCOMER, `select public.redeem_access_link('${link.code}') as r`))[0].r, "added");
+  assert.equal((await as(NEWCOMER, "select public.my_app_access() as a"))[0].a, "allowed");
+  await as(NEWCOMER, `select public.create_household('Mine')`);
+  // Matched on the lowercased Google email.
+  const [row] = await as(JOE, "select email, via, use_count from public.app_access join public.access_links l on l.id = link_id");
+  assert.deepEqual(row, { email: "new.comer@example.com", via: "link", use_count: 1 });
+
+  // Single-use: the next person is turned away.
+  await assert.rejects(as(FRIEND, `select public.redeem_access_link('${link.code}')`), /invite_link_invalid/);
+  const [open] = await as(JOE, `insert into public.access_links (max_uses) values (5) returning id, code`);
+  await as(JOE, `update public.access_links set revoked_at = now() where id = '${open.id}'`);
+  await assert.rejects(as(FRIEND, `select public.redeem_access_link('${open.code}')`), /invite_link_invalid/);
+  const [old] = await as(JOE, `insert into public.access_links (expires_at) values (now() - interval '1 minute') returning code`);
+  await assert.rejects(as(FRIEND, `select public.redeem_access_link('${old.code}')`), /invite_link_invalid/);
+  await assert.rejects(as(FRIEND, `select public.redeem_access_link('nope')`), /invite_link_invalid/);
+});
+
+test("only the owner sees and manages invite links and the access list", async () => {
+  const { as } = await setup();
+  await as(JOE, `insert into public.access_links (label) values ('x')`);
+  assert.equal((await as(STRANGER, "select count(*)::int as n from public.access_links"))[0].n, 0);
+  assert.equal((await as(STRANGER, "select count(*)::int as n from public.app_access"))[0].n, 0);
+  assert.equal((await as(JOE, "select count(*)::int as n from public.app_access"))[0].n, 2);
+  await assert.rejects(as(STRANGER, `insert into public.access_links (label) values ('mine')`), /row-level security/);
+  await assert.rejects(as(NEWCOMER, "select * from public.app_owners"), /permission denied/);
+  // The owner can't lock themselves out.
+  await as(JOE, "delete from public.app_access where email = 'joe@example.com'");
+  assert.equal((await as(JOE, "select public.my_app_access() as a"))[0].a, "owner");
+});
+
+test("a partner invite lets someone new in, and taking access away closes the household", async () => {
+  const { as } = await setup();
+  const [{ id: household }] = await as(JOE, `select public.create_household('Home') as id`);
+  await as(JOE, `insert into public.recipes (household_id, title) values ('${household}', 'Tacos')`);
+  const [{ token }] = await as(JOE, `insert into public.household_invites (household_id) values ('${household}') returning token`);
+  await as(NEWCOMER, `select public.accept_household_invite('${token}')`);
+  assert.equal((await as(NEWCOMER, "select public.my_app_access() as a"))[0].a, "allowed");
+  assert.equal((await as(NEWCOMER, "select count(*)::int as n from public.recipes"))[0].n, 1);
+
+  await as(JOE, "delete from public.app_access where email = 'new.comer@example.com'");
+  assert.equal((await as(NEWCOMER, "select count(*)::int as n from public.recipes"))[0].n, 0);
+  assert.equal((await as(NEWCOMER, "select count(*)::int as n from public.households"))[0].n, 0);
+  assert.equal((await as(JOE, "select count(*)::int as n from public.recipes"))[0].n, 1);
+});
+
+test("everyone already signed up keeps access, and the first one is the owner", async () => {
+  await previous?.close();
+  const db = new PGlite();
+  previous = db;
+  await db.exec(SUPABASE_STUBS);
+  const files = migrations();
+  const gate = files.findIndex((f) => f.endsWith("_invite_only.sql"));
+  for (const file of files.slice(0, gate)) await db.exec(readFileSync(join(migrationsDir, file), "utf8"));
+  await db.exec(`insert into auth.users (id, raw_user_meta_data, email, created_at) values
+    ('${PARTNER}', '{}', 'Partner@Example.com', '2026-11-20 12:00'), ('${JOE}', '{}', 'joe@example.com', '2026-11-20 09:00')`);
+  for (const file of files.slice(gate)) await db.exec(readFileSync(join(migrationsDir, file), "utf8"));
+  const { rows: list } = await db.query("select email, via from public.app_access order by email");
+  assert.deepEqual(list, [{ email: "joe@example.com", via: "existing" }, { email: "partner@example.com", via: "existing" }]);
+  const { rows: owners } = await db.query("select user_id from public.app_owners");
+  assert.deepEqual(owners, [{ user_id: JOE }]);
+});
+
+test("meals and ingredient lines can't point at another household's rows", async () => {
+  const { as } = await setup();
+  const [{ id: mine }] = await as(JOE, `select public.create_household('Home') as id`);
+  const [{ id: theirs }] = await as(STRANGER, `select public.create_household('Other') as id`);
+  const [myRecipe] = await as(JOE, `insert into public.recipes (household_id, title) values ('${mine}', 'Tacos') returning id`);
+  const [myPlan] = await as(JOE, `insert into public.meal_plans (household_id, week_start) values ('${mine}', '2026-11-30') returning id`);
+  const [theirRecipe] = await as(STRANGER, `insert into public.recipes (household_id, title) values ('${theirs}', 'Secret stew') returning id`);
+  const [theirPlan] = await as(STRANGER, `insert into public.meal_plans (household_id, week_start) values ('${theirs}', '2026-11-30') returning id`);
+  const [theirIngredient] = await as(STRANGER, `insert into public.ingredients (household_id, name) values ('${theirs}', 'saffron') returning id`);
+  const dinner = (plan, recipe) =>
+    `insert into public.planned_dinners (plan_id, household_id, recipe_id, date, servings) values ('${plan}', '${mine}', '${recipe}', '2026-12-01', 2) returning id`;
+
+  await assert.rejects(as(JOE, dinner(myPlan.id, theirRecipe.id)), /other_household/);
+  await assert.rejects(as(JOE, dinner(theirPlan.id, myRecipe.id)), /other_household/);
+  const [ok] = await as(JOE, dinner(myPlan.id, myRecipe.id));
+  await assert.rejects(as(JOE, `update public.planned_dinners set recipe_id = '${theirRecipe.id}' where id = '${ok.id}'`), /other_household/);
+  // Updates that don't touch the links still work.
+  await as(JOE, `update public.planned_dinners set status = 'cooked' where id = '${ok.id}'`);
+
+  await assert.rejects(
+    as(JOE, `insert into public.recipe_ingredients (recipe_id, ingredient_id, position, raw_text) values ('${myRecipe.id}', '${theirIngredient.id}', 0, 'a pinch')`),
+    /other_household/,
+  );
+  await as(JOE, `insert into public.recipe_ingredients (recipe_id, ingredient_id, position, raw_text) values ('${myRecipe.id}', null, 0, 'salt')`);
+  // The other household can still erase its recipe.
+  await as(STRANGER, `delete from public.recipes where id = '${theirRecipe.id}'`);
 });

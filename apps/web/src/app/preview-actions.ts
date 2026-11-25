@@ -21,7 +21,7 @@ export type RecipePreview = {
 /** What the Chef page's slide-out shows for one recipe. Reads through the viewer's own access, like the recipe page. */
 export async function loadRecipePreview(id: string): Promise<RecipePreview | null> {
   const viewer = await getViewer();
-  if (viewer.kind === "signed-out") return null;
+  if (viewer.kind === "signed-out" || viewer.kind === "no-access") return null;
   const r = viewer.kind === "sample" ? sampleRecipes.find((s) => s.id === id) : await getRecipe(id);
   if (!r) return null;
   return {
