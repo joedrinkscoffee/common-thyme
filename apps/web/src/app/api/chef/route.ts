@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getViewer } from "@/lib/household";
 import { chefDailyLimit } from "@/lib/admin";
-import { PHOTO_TYPES } from "@/lib/recipe-photo";
+import { readSentPhoto } from "@/lib/sent-photo";
+import { sameOrigin } from "@/lib/request-origin";
 import { runChef, type HistoryItem } from "@/lib/chef/agent";
 import { ChefSession, type Attachment } from "@/lib/chef/session";
 import { chefConnected, chefContext, loadCalendarNights, loadMessages, saveMessage } from "@/lib/chef/server";
@@ -11,16 +12,12 @@ import type { ChefTurnResponse } from "@/lib/chef/home";
 export const maxDuration = 300;
 
 const MAX_TEXT = 4000;
-const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
-
 
 const json = (body: ChefTurnResponse, status = 200) => Response.json(body, { status });
 
 export async function POST(request: Request) {
   // Only this site's own pages may ask Chef for things.
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (origin && host && new URL(origin).host !== host) return json({ ok: false, error: "Not allowed." }, 403);
+  if (!sameOrigin(request)) return json({ ok: false, error: "Not allowed." }, 403);
 
   const viewer = await getViewer();
   if (viewer.kind !== "signed-in" || !viewer.household) return json({ ok: false, error: "Sign in first." }, 401);
@@ -28,20 +25,16 @@ export async function POST(request: Request) {
     return json({ ok: false, error: "I'm not hooked up yet. Once the Anthropic key is added in Vercel, I can plan and change your week." }, 503);
   }
 
-  let body: { text?: unknown; image?: { data?: unknown; type?: unknown } | null };
+  let body: { text?: unknown; image?: unknown };
   try {
     body = await request.json();
   } catch {
     return json({ ok: false, error: "Couldn't read that message." }, 400);
   }
   const text = typeof body.text === "string" ? body.text.trim().slice(0, MAX_TEXT) : "";
-  let attachment: Attachment | null = null;
-  if (body.image && typeof body.image.data === "string" && typeof body.image.type === "string") {
-    if (!(PHOTO_TYPES as readonly string[]).includes(body.image.type)) return json({ ok: false, error: "Send a JPEG, PNG or WebP photo." }, 400);
-    const bytes = Uint8Array.from(Buffer.from(body.image.data, "base64"));
-    if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) return json({ ok: false, error: "That photo is too big." }, 400);
-    attachment = { bytes, contentType: body.image.type };
-  }
+  const sent = readSentPhoto(body.image);
+  if (sent && "error" in sent) return json({ ok: false, error: sent.error }, 400);
+  const attachment: Attachment | null = sent;
   if (!text && !attachment) return json({ ok: false, error: "Say something first." }, 400);
 
   const household = viewer.household;

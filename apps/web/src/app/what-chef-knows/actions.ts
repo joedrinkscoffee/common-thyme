@@ -2,14 +2,14 @@
 
 import { refresh } from "next/cache";
 import { getViewer } from "@/lib/household";
-import { chefContext } from "@/lib/chef/server";
+import { householdStore } from "@/lib/chef/server";
 import { fetchCalendar, normalizeCalendarUrl, parseEvents } from "@/lib/chef/calendar";
 import { createClient } from "@/lib/supabase/server";
 
 export async function forgetNote(noteId: string): Promise<void> {
   const viewer = await getViewer();
   if (viewer.kind !== "signed-in" || !viewer.household) return;
-  const { store } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
+  const { store } = await householdStore({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
   await store.forgetNote(noteId);
   refresh();
 }
@@ -29,7 +29,7 @@ export async function saveCalendar(_prev: CalendarFormState, form: FormData): Pr
   } catch {
     return { ok: false, message: "Couldn't read that calendar file." };
   }
-  const { db } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
+  const { db } = await householdStore({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
   const { error } = await db.from("household_calendars").upsert({
     household_id: viewer.household.id,
     ics_url: checked.url,
@@ -46,7 +46,7 @@ export async function saveCalendar(_prev: CalendarFormState, form: FormData): Pr
 export async function removeCalendar(): Promise<void> {
   const viewer = await getViewer();
   if (viewer.kind !== "signed-in" || !viewer.household) return;
-  const { db } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
+  const { db } = await householdStore({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
   await db.from("household_calendars").delete().eq("household_id", viewer.household.id);
   refresh();
 }

@@ -5,19 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_PHOTO_BYTES, PHOTO_TYPES } from "@/lib/recipe-photo";
 import { photoTarget, savePhoto } from "@/app/recipes/[id]/actions";
+import { drawScaled } from "@/lib/shrink-photo";
 
 const LONG_EDGE = 1600;
 
 /** Shrinks big phone photos to a sensible size. Falls back to the original file if the browser can't. */
 async function prepare(file: File): Promise<Blob> {
   try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, LONG_EDGE / Math.max(bitmap.width, bitmap.height));
-    if (scale === 1 && file.size <= 2 * 1024 * 1024 && (PHOTO_TYPES as readonly string[]).includes(file.type)) return file;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const { canvas, scaled } = await drawScaled(file, LONG_EDGE);
+    if (!scaled && file.size <= 2 * 1024 * 1024 && (PHOTO_TYPES as readonly string[]).includes(file.type)) return file;
     const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, "image/jpeg", 0.85));
     return blob ?? file;
   } catch {

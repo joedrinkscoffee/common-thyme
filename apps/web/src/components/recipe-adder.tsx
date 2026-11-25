@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { byFolder, linksFromBookmarks, linksFromText, MAX_LINKS_PER_RUN, type FoundLink } from "@/lib/link-list";
 import type { AddRecipeResponse } from "@/app/api/recipes/add/route";
+import { photoForClaude } from "@/lib/shrink-photo";
 
-const LONG_EDGE = 1568;
 const MAX_PHOTOS = 30;
 const AT_ONCE = 3;
 
@@ -13,20 +13,9 @@ type Photo = { key: string; data: string; type: string; preview: string; name: s
 type State = "waiting" | "working" | AddRecipeResponse;
 type Item = { key: string; label: string; url?: string; photo?: Photo; state: State };
 
-/** Shrinks a photo for Claude to read: long edge 1568px, JPEG. */
 async function preparePhoto(file: File): Promise<Photo | null> {
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, LONG_EDGE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const url = canvas.toDataURL("image/jpeg", 0.85);
-    return { key: crypto.randomUUID(), data: url.split(",")[1], type: "image/jpeg", preview: url, name: file.name };
-  } catch {
-    return null;
-  }
+  const got = await photoForClaude(file);
+  return got && { key: crypto.randomUUID(), ...got, name: file.name };
 }
 
 const host = (url: string) => {

@@ -4,6 +4,7 @@ import { listTags } from "@/lib/recipes";
 import { matchKey, normalizeUnit, parseIngredientLine } from "@/lib/ingredient-line";
 import { validateRecipeEdit, type EditErrors } from "@/lib/recipe-edit";
 import { canonicalTags } from "@/lib/tags";
+import { one, type One } from "@/lib/supabase/rows";
 
 export type SaveResult =
   | { ok: true; updatedAt: string }
@@ -94,12 +95,11 @@ export async function tidyIngredientLines(householdId: string): Promise<{ ok: bo
   const { data: known } = await supabase.from("ingredients").select("id, name").eq("household_id", householdId);
   const byKey = new Map((known ?? []).map((i) => [matchKey(i.name), i.id]));
 
-  type Perishable = { perishable: boolean } | { perishable: boolean }[] | null;
-  const parsed = lines.map((l) => {
-    const linked = l.ingredients as Perishable;
-    const old = Array.isArray(linked) ? linked[0] : linked;
-    return { line: l, parts: parseIngredientLine(l.raw_text), wasPerishable: !!old?.perishable };
-  });
+  const parsed = lines.map((l) => ({
+    line: l,
+    parts: parseIngredientLine(l.raw_text),
+    wasPerishable: !!one(l.ingredients as One<{ perishable: boolean }>)?.perishable,
+  }));
 
   // New base ingredients keep the perishable flag of whatever the line pointed at before.
   const missing = new Map<string, { name: string; perishable: boolean }>();

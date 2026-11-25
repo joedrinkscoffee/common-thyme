@@ -8,6 +8,9 @@ describe("recipe photo paths", () => {
   it("names a new photo inside the household folder", () => {
     expect(photoPathFor(hh, id, "image/jpeg", 1763680000000)).toBe(`${hh}/${id}-1763680000000.jpg`);
     expect(photoPathFor(hh, id, "image/heic", 1)).toBeNull();
+    // Photos copied from recipe sites can be AVIF or GIF.
+    expect(photoPathFor(hh, id, "image/avif", 1)).toBe(`${hh}/${id}-1.avif`);
+    expect(photoPathFor(hh, id, "image/gif", 1)).toBe(`${hh}/${id}-1.gif`);
   });
 
   it("accepts only this recipe's photos", () => {

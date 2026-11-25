@@ -9,30 +9,14 @@ import type { Brief, Segment } from "@/lib/chef/brief";
 import type { ChefTurnResponse, HomeMessage } from "@/lib/chef/home";
 import { checkInDinner } from "@/app/chef-actions";
 import type { CheckInAction } from "@/lib/chef/check-in";
+import { photoForClaude } from "@/lib/shrink-photo";
 
 const STICKERS = ["bg-lemon", "bg-caper", "bg-kale"];
-const LONG_EDGE = 1568;
 /** The chat box grows with the text up to this height (about 7 lines), then scrolls. */
 const INPUT_MAX_HEIGHT = 196;
 const NOT_CONNECTED = "I'm not hooked up yet, so I can't act on that. Once the Anthropic key is in, I'll change the week right here.";
 
 type Photo = { data: string; type: string; preview: string };
-
-/** Shrinks a photo for Chef to read: long edge 1568px, JPEG. */
-async function preparePhoto(file: File): Promise<Photo | null> {
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, LONG_EDGE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const url = canvas.toDataURL("image/jpeg", 0.85);
-    return { data: url.split(",")[1], type: "image/jpeg", preview: url };
-  } catch {
-    return null;
-  }
-}
 
 function Paragraph({ segments }: { segments: Segment[] }) {
   let sticker = 0;
@@ -383,7 +367,7 @@ export function ChefChat({
               const file = e.target.files?.[0];
               e.target.value = "";
               if (!file) return;
-              const prepared = await preparePhoto(file);
+              const prepared = await photoForClaude(file);
               if (prepared) setPhoto(prepared);
               else setError("Couldn't read that photo. Try a JPEG or PNG?");
             }}

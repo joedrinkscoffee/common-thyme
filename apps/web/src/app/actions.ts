@@ -1,10 +1,10 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/household";
+import { requestOrigin } from "@/lib/request-origin";
 
 export type ActionResult = { error?: string; inviteUrl?: string } | null;
 
@@ -29,10 +29,7 @@ export async function createInvite(): Promise<ActionResult> {
     .single();
   if (error || !data) return { error: "Couldn't make an invite link. Try again?" };
 
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return { inviteUrl: `${proto}://${host}/invite/${data.token}` };
+  return { inviteUrl: `${await requestOrigin()}/invite/${data.token}` };
 }
 
 export async function acceptInvite(token: string): Promise<ActionResult> {

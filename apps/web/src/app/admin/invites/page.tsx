@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin-shell";
 import { InviteLinks, type AccessRow, type LinkRow } from "@/components/invite-links";
 import { getViewer } from "@/lib/household";
 import { linkState } from "@/lib/access-links";
 import { createClient } from "@/lib/supabase/server";
+import { requestOrigin } from "@/lib/request-origin";
 
 export const metadata: Metadata = { title: "Invites · Admin · Common Thyme" };
 
@@ -17,13 +17,12 @@ async function Content() {
   if (viewer.kind === "sample" || !viewer.isAdmin) redirect("/");
 
   const supabase = await createClient();
-  const [{ data: links }, { data: people }, { data: me }, h] = await Promise.all([
+  const [{ data: links }, { data: people }, { data: me }, origin] = await Promise.all([
     supabase.from("access_links").select("id, code, label, max_uses, use_count, expires_at, revoked_at, created_at").order("created_at", { ascending: false }).limit(100),
     supabase.from("app_access").select("email, via, link_id, created_at").order("created_at", { ascending: false }).limit(500),
     supabase.rpc("my_email"),
-    headers(),
+    requestOrigin(),
   ]);
-  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
   const labelOf = new Map((links ?? []).map((l) => [l.id as string, l.label as string | null]));
 
   const linkRows: LinkRow[] = (links ?? []).map((l) => ({

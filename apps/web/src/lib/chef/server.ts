@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { firstNames } from "@/lib/supabase/rows";
 import { addDays, hourIn, todayIn, weekStartOf } from "./dates";
 import { buildHome, type ChefHomeData, type HomeMessage } from "./home";
 import type { Choice } from "./session";
@@ -16,9 +17,15 @@ export type HouseholdViewer = {
 
 export const chefConnected = () => !!process.env.ANTHROPIC_API_KEY;
 
-export async function chefContext(viewer: HouseholdViewer) {
+/** The household's database and Chef store, without reading its settings. Enough for a quick save. */
+export async function householdStore(viewer: HouseholdViewer) {
   const db = await createClient();
-  const store = new SupabaseChefStore(db, viewer.household.id, viewer.userId);
+  return { db, store: new SupabaseChefStore(db, viewer.household.id, viewer.userId) };
+}
+
+/** householdStore plus the household's settings and today's date in its time zone. */
+export async function chefContext(viewer: HouseholdViewer) {
+  const { db, store } = await householdStore(viewer);
   const settings = await store.settings();
   return { db, store, settings, today: todayIn(settings.timezone), hour: hourIn(settings.timezone) };
 }
@@ -43,12 +50,7 @@ export async function loadMessages(db: SupabaseClient, householdId: string, opts
   if (opts.since) q = q.gte("created_at", opts.since);
   const { data } = await q;
   const rows = ((data ?? []) as MessageRow[]).reverse();
-  const authorIds = [...new Set(rows.map((r) => r.author_id).filter((x): x is string => !!x))];
-  const names = new Map<string, string>();
-  if (authorIds.length) {
-    const { data: people } = await db.from("profiles").select("id, display_name").in("id", authorIds);
-    for (const p of people ?? []) if (p.display_name) names.set(p.id, p.display_name.split(" ")[0]);
-  }
+  const names = await firstNames(db, rows.map((r) => r.author_id));
   return rows.map((r) => ({
     id: r.id,
     role: r.role,

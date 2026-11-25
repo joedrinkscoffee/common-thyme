@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatAmount, matchKey, parseIngredientLine } from "@/lib/ingredient-line";
+import { firstNames, one, type One } from "@/lib/supabase/rows";
+import { formatAmount, matchKey, normalizeUnit, parseIngredientLine } from "@/lib/ingredient-line";
 import { downloadPhoto } from "@/lib/photo-fetch";
 import { photoPathFor } from "@/lib/recipe-photo";
 import { updateRecipe } from "@/lib/recipe-save";
@@ -8,7 +9,6 @@ import type { RecipeEditInput } from "@/lib/recipe-edit";
 import type { CatalogRecipe } from "./planner";
 import { tierOf, type ShareTier } from "./ingredient-tier";
 import { addDays } from "./dates";
-import { normalizeUnit } from "@/lib/ingredient-line";
 import { extraKey, type GroceryLine, type GroceryMark, type GroceryStatus } from "@/lib/grocery/list";
 import type { Aisle } from "@/lib/grocery/aisles";
 import {
@@ -26,9 +26,6 @@ import {
   type StoredPlan,
   type GroceryWeek,
 } from "./store";
-
-type One<T> = T | T[] | null;
-const one = <T,>(v: One<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
 type DinnerRow = {
   id: string;
@@ -216,10 +213,15 @@ export class SupabaseChefStore implements ChefStore {
     return { ok: true, id: row.id, title: recipe.title, photo };
   }
 
-  async setIngredientTier(name: string, tier: ShareTier): Promise<number> {
+  /** The household's ingredients that match a name, ignoring case and plurals. */
+  private async ingredientIdsNamed(name: string): Promise<string[]> {
     const key = matchKey(name);
     const { data } = await this.db.from("ingredients").select("id, name").eq("household_id", this.householdId);
-    const ids = (data ?? []).filter((i) => matchKey(i.name) === key).map((i) => i.id);
+    return (data ?? []).filter((i) => matchKey(i.name) === key).map((i) => i.id);
+  }
+
+  async setIngredientTier(name: string, tier: ShareTier): Promise<number> {
+    const ids = await this.ingredientIdsNamed(name);
     if (!ids.length) return 0;
     const { error } = await this.db.from("ingredients").update({ share_tier: tier }).in("id", ids);
     if (error) fail("set ingredient tier", error);
@@ -366,12 +368,7 @@ export class SupabaseChefStore implements ChefStore {
     const { error } = marksRead;
     const rows = marksRead.data as MarkRow[] | null;
     if (error) return { meals, marks: [], ready: false, haveReady: false };
-    const people = [...new Set((rows ?? []).map((r) => r.checked_by).filter((x): x is string => !!x))];
-    const names = new Map<string, string>();
-    if (people.length) {
-      const { data: ps } = await this.db.from("profiles").select("id, display_name").in("id", people);
-      for (const p of ps ?? []) if (p.display_name) names.set(p.id, p.display_name.split(" ")[0]);
-    }
+    const names = await firstNames(this.db, (rows ?? []).map((r) => r.checked_by));
     const marks: GroceryMark[] = (rows ?? []).map((r) => ({
       key: r.item_key,
       label: r.label,
@@ -421,9 +418,7 @@ export class SupabaseChefStore implements ChefStore {
   }
 
   async setIngredientAisle(name: string, aisle: Aisle | null): Promise<number> {
-    const key = matchKey(name);
-    const { data } = await this.db.from("ingredients").select("id, name").eq("household_id", this.householdId);
-    const ids = (data ?? []).filter((i) => matchKey(i.name) === key).map((i) => i.id);
+    const ids = await this.ingredientIdsNamed(name);
     if (!ids.length) return 0;
     const { error } = await this.db.from("ingredients").update({ aisle }).in("id", ids);
     if (error) fail("set ingredient aisle", error);

@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseEnv } from "@/lib/supabase/env";
+import { firstNameOf, one, type One } from "@/lib/supabase/rows";
 
 export type Viewer =
   | { kind: "sample" } // Supabase not configured yet
@@ -30,7 +31,7 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer> {
 
   const meta = (claims.user_metadata ?? {}) as Record<string, unknown>;
   const fullName = (meta.full_name ?? meta.name ?? null) as string | null;
-  const firstName = fullName ? fullName.split(" ")[0] : null;
+  const firstName = firstNameOf(fullName);
 
   // v1: one household per person.
   const [{ data: access }, { data: membership }] = await Promise.all([
@@ -56,8 +57,7 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer> {
     .select("user_id", { count: "exact", head: true })
     .eq("household_id", membership.household_id);
 
-  const households = membership.households as { name: string } | { name: string }[] | null;
-  const name = Array.isArray(households) ? households[0]?.name : households?.name;
+  const name = one(membership.households as One<{ name: string }>)?.name;
 
   return {
     kind: "signed-in",
