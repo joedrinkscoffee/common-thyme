@@ -54,8 +54,6 @@ async function Groceries({ searchParams }: { searchParams: Promise<{ week?: stri
         { weekStart: addDays(thisWeek, 7), label: "Next week", active: week !== thisWeek, empty: week === thisWeek && !otherWeekHasMeals },
       ]}
       list={list}
-      ready={data.ready}
-      haveReady={data.haveReady}
       firstName={firstName}
       sample={viewer.kind === "sample"}
     />

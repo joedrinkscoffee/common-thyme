@@ -631,10 +631,6 @@ export class ChefSession {
           notes.push(`"${name}" isn't on the list.`);
           continue;
         }
-        if (!before.haveReady) {
-          notes.push(`Couldn't mark ${item.name.toLowerCase()}: "already have it" needs the latest grocery update run in Supabase.`);
-          continue;
-        }
         await this.store.setGroceryStatus(weekStart, item.key, status);
         notes.push(status === "have" ? `Marked ${item.name.toLowerCase()} as already on hand.` : `Put ${item.name.toLowerCase()} on the list to buy.`);
       }
@@ -649,7 +645,6 @@ export class ChefSession {
       text: [
         ...notes,
         groceryText(list),
-        week.ready ? "" : "Check marks and added items can't be saved until the grocery update is run in Supabase; say so if they tried.",
         "The list is linked under your reply, grouped by aisle, and keeps up as meals change. Don't repeat the list; say what's notable in a line (how many items, the big shared buys).",
       ]
         .filter(Boolean)

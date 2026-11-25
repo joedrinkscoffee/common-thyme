@@ -322,17 +322,13 @@ export class SupabaseChefStore implements ChefStore {
     type IngRow = { name: string; aisle?: string | null };
     type LineRow = { position: number; raw_text: string; quantity: number | string | null; unit: string | null; name: string | null; ingredients: One<IngRow> };
     type MealRow = { id: string; date: string; meal: StoredDinner["meal"] | null; servings: number; recipes: One<{ title: string; base_servings: number; recipe_ingredients: LineRow[] | null }> };
-    const read = (aisle: boolean) =>
-      this.db
-        .from("planned_dinners")
-        .select(`id, date, meal, servings, recipes(title, base_servings, recipe_ingredients(position, raw_text, quantity, unit, name, ingredients(name${aisle ? ", aisle" : ""})))`)
-        .eq("household_id", this.householdId)
-        .gte("date", weekStart)
-        .lte("date", addDays(weekStart, 6))
-        .in("status", ["planned", "cooked"]);
-    let got = await read(true);
-    // Before the grocery migration runs there's no aisle column; read without it.
-    if (got.error) got = await read(false);
+    const got = await this.db
+      .from("planned_dinners")
+      .select("id, date, meal, servings, recipes(title, base_servings, recipe_ingredients(position, raw_text, quantity, unit, name, ingredients(name, aisle)))")
+      .eq("household_id", this.householdId)
+      .gte("date", weekStart)
+      .lte("date", addDays(weekStart, 6))
+      .in("status", ["planned", "cooked"]);
     if (got.error) fail("read grocery meals", got.error);
     const meals = ((got.data ?? []) as unknown as MealRow[])
       .map((d) => {
@@ -354,20 +350,14 @@ export class SupabaseChefStore implements ChefStore {
       })
       .sort(byDayAndMeal);
 
-    type MarkRow = { item_key: string; label: string | null; aisle: string | null; checked_at: string | null; checked_by: string | null; status?: string | null };
-    const readMarks = (withStatus: boolean) =>
-      this.db
-        .from("grocery_items")
-        .select(`item_key, label, aisle, checked_at, checked_by${withStatus ? ", status" : ""}`)
-        .eq("household_id", this.householdId)
-        .eq("week_start", weekStart);
-    let marksRead = await readMarks(true);
-    // Before the "already have it" migration runs there's no status column.
-    const haveReady = !marksRead.error;
-    if (marksRead.error) marksRead = await readMarks(false);
-    const { error } = marksRead;
-    const rows = marksRead.data as MarkRow[] | null;
-    if (error) return { meals, marks: [], ready: false, haveReady: false };
+    type MarkRow = { item_key: string; label: string | null; aisle: string | null; checked_at: string | null; checked_by: string | null; status: string | null };
+    const { data, error } = await this.db
+      .from("grocery_items")
+      .select("item_key, label, aisle, checked_at, checked_by, status")
+      .eq("household_id", this.householdId)
+      .eq("week_start", weekStart);
+    if (error) fail("read grocery marks", error);
+    const rows = data as MarkRow[] | null;
     const names = await firstNames(this.db, (rows ?? []).map((r) => r.checked_by));
     const marks: GroceryMark[] = (rows ?? []).map((r) => ({
       key: r.item_key,
@@ -377,7 +367,7 @@ export class SupabaseChefStore implements ChefStore {
       checkedBy: r.checked_by ? (names.get(r.checked_by) ?? null) : null,
       status: r.status === "have" || r.status === "need" ? r.status : null,
     }));
-    return { meals, marks, ready: true, haveReady };
+    return { meals, marks };
   }
 
   async checkGroceryItem(weekStart: string, key: string, checked: boolean) {

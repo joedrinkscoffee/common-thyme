@@ -37,7 +37,5 @@ export function sampleGroceryWeek(weekStart: string): GroceryWeek {
       { key: extraKey("Paper towels"), label: "paper towels", aisle: null, checked: false },
       { key: extraKey("Oat milk"), label: "oat milk", aisle: null, checked: false },
     ],
-    ready: true,
-    haveReady: true,
   };
 }

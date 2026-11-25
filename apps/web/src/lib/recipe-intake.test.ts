@@ -60,6 +60,8 @@ describe("addFromLink", () => {
     const res = await addFromLink(d, "https://blog.com/dal");
     expect(res.status).toBe("saved");
     expect(saved[0]).toMatchObject({ title: "Weeknight Dal", totalMinutes: 30, servings: 4, perishable: ["spinach"], photo: { url: "https://blog.com/og.jpg" } });
+    // Copying a recipe runs on Sonnet, not Chef's Opus.
+    expect(d.call).toHaveBeenCalledWith(expect.objectContaining({ model: "claude-sonnet-5-5", fallbacks: "default" }));
   });
 
   it("passes on why a page isn't a recipe", async () => {
