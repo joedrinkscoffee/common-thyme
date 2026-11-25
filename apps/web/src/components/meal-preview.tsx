@@ -14,6 +14,9 @@ import type { HomeDinner, HomeWeek } from "@/lib/chef/brief";
 import { dayName } from "@/lib/chef/dates";
 import { sharedFor, sharedWithWeek, type SharedIngredient } from "@/lib/chef/shared-with";
 import { IngredientText } from "./ingredient-text";
+import { CookedStamp } from "./dinner-mark";
+import { DishPlaceholder } from "./dish-art";
+import { ProduceSticker } from "./produce-sticker";
 
 const PARAM = "meal";
 
@@ -110,9 +113,7 @@ function NavButton({ dinner, dir, onGo }: { dinner: HomeDinner | undefined; dir:
 
 function SharedSticker({ shared }: { shared: SharedIngredient }) {
   return (
-    <span className="ml-1.5 inline-block -rotate-2 whitespace-nowrap rounded-full border-[1.5px] border-ink bg-lemon px-1.5 py-px align-[1px] text-[11px] font-extrabold">
-      also {shared.with.map(shortDay).join(", ")}
-    </span>
+    <ProduceSticker name={`also ${shared.with.map(shortDay).join(", ")}`} colorOf={shared.key} className="ml-1.5 align-[1px] text-[11px]" />
   );
 }
 
@@ -253,9 +254,11 @@ export function MealPreview({ weeks, today }: { weeks: HomeWeek[]; today: string
         <div className="flex h-full flex-col">
           <div ref={scroller} className="flex-1 overflow-y-auto overscroll-contain">
             <div className="relative aspect-[3/2] w-full flex-none border-b-2 border-ink bg-sand">
-              {photo && (
+              {photo ? (
                 // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
                 <img src={photo} alt={`Photo of ${dinner.title}`} className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <DishPlaceholder seed={dinner.recipeId} />
               )}
               <div className="absolute left-3 top-3 flex gap-1.5">
                 <span className={`rounded-full px-2.5 py-1 text-[12px] font-bold ${dayLabel(dinner, today) === "Tonight" ? "bg-tomato text-white" : "bg-ink text-cream"}`}>
@@ -264,9 +267,7 @@ export function MealPreview({ weeks, today }: { weeks: HomeWeek[]; today: string
                 {dinner.sharedWithKids && (
                   <span className="rotate-3 rounded-full border-[1.5px] border-ink bg-lemon px-2.5 py-1 text-[12px] font-extrabold">+kids</span>
                 )}
-                {dinner.status === "cooked" && (
-                  <span className="-rotate-3 rounded-full border-[1.5px] border-ink bg-caper px-2.5 py-1 text-[12px] font-extrabold">✓ cooked</span>
-                )}
+                {dinner.status === "cooked" && <CookedStamp dinnerId={dinner.id} />}
               </div>
               <button
                 type="button"

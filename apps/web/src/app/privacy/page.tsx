@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Privacy · Common Thyme" };
 export default function PrivacyPage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-8 leading-relaxed">
-      <Link href="/" className="font-display text-lg font-extrabold text-ink no-underline">
+      <Link href="/" className="font-brand text-lg font-normal text-ink no-underline">
         Common <span className="text-tomato">Thyme</span>
       </Link>
       <h1 className="mt-8 font-display text-4xl font-extrabold leading-none tracking-tight">Privacy</h1>

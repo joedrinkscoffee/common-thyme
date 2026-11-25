@@ -29,13 +29,13 @@ async function CheckIn({ searchParams }: { searchParams: Promise<{ t?: string | 
 export default function CheckInPage({ searchParams }: PageProps<"/check-in">) {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-5 py-8">
-      <Link href="/" className="font-display text-lg font-extrabold text-ink no-underline">
+      <Link href="/" className="font-brand text-lg font-normal text-ink no-underline">
         Common <span className="text-tomato">Thyme</span>
       </Link>
       <section className="mt-8 flex flex-col gap-5 rounded-[28px] border-2 border-ink bg-paper p-6">
         <div className="flex items-center gap-3">
           <ChefAvatar size={44} />
-          <div className="font-display text-xl font-extrabold">Chef</div>
+          <div className="font-brand text-xl font-normal">Chef</div>
         </div>
         <Suspense fallback={<p className="m-0 text-lg">One moment…</p>}>
           <CheckIn searchParams={searchParams as Promise<{ t?: string | string[] }>} />

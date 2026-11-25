@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { RecipePhotoButton } from "@/components/recipe-photo-button";
+import { DishPlaceholder } from "@/components/dish-art";
 import { SiteHeader } from "@/components/site-header";
 import { RecipeSkeleton } from "@/components/skeletons";
 import { getViewer } from "@/lib/household";
@@ -66,9 +67,11 @@ async function Recipe({ params }: { params: Promise<{ id: string }> }) {
     <article className="flex flex-wrap items-start gap-8">
       <div className="min-w-[260px] flex-[1_1_380px]">
         <div className="relative aspect-square overflow-hidden rounded-[22px] border-2 border-ink bg-sand">
-          {recipe.photoUrl && (
+          {recipe.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
             <img src={recipe.photoUrl} alt={`Photo of ${recipe.title}`} className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <DishPlaceholder seed={recipe.id} />
           )}
           {viewer.kind === "signed-in" && <RecipePhotoButton recipeId={recipe.id} hasPhoto={!!recipe.photoUrl} />}
         </div>

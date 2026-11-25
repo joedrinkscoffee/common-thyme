@@ -21,6 +21,7 @@ function Home({ data, statusLabel, partnerSlot = null, sample = false }: { data:
         connected={data.connected}
         firstName={data.firstName}
         statusLabel={statusLabel}
+        today={data.today}
         partnerSlot={partnerSlot}
         sample={sample}
       />

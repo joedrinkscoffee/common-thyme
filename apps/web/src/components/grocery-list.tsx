@@ -29,6 +29,7 @@ import {
   type GroceryList,
   type GroceryStatus,
 } from "@/lib/grocery/list";
+import { ProduceSticker } from "./produce-sticker";
 
 type Tab = {
   weekStart: string;
@@ -61,6 +62,26 @@ function Tags({ item, muted = false }: { item: GroceryItem; muted?: boolean }) {
         </span>
       ))}
     </span>
+  );
+}
+
+/** How many of the week's recipes need this item. */
+function sharedCount(item: GroceryItem): number {
+  return item.extra ? 0 : recipesFor(item).length;
+}
+
+/** The bottom of the receipt: how many buys carry across more than one meal. */
+function SharedTally({ items }: { items: GroceryItem[] }) {
+  const shared = items.filter((i) => sharedCount(i) > 1);
+  if (!shared.length) return null;
+  const uses = shared.reduce((n, i) => n + sharedCount(i), 0);
+  return (
+    <p className="m-0 mx-3 mt-2 border-t-[1.5px] border-dashed border-dash pt-4 text-center text-[14px] text-muted">
+      Shared buys this week
+      <span className="block font-display text-2xl font-extrabold text-[#2f7a3e]">
+        {shared.length} {shared.length === 1 ? "buy" : "buys"} · used {uses} times
+      </span>
+    </p>
   );
 }
 
@@ -112,6 +133,9 @@ function Row({
               >
                 {item.amount}
               </span>
+            )}
+            {sharedCount(item) > 1 && (
+              <ProduceSticker name={`×${sharedCount(item)}`} colorOf={item.name} className="self-center no-underline text-[12px]" />
             )}
           </span>
           <Tags item={item} muted={checked} />
@@ -502,46 +526,50 @@ export function GroceryListView({
         </div>
       )}
 
-      {sections.map((s) => {
-        const sorted = [...s.items].sort(
-          (a, b) => Number(isChecked(a)) - Number(isChecked(b)),
-        );
-        const open = s.items.filter((i) => !isChecked(i)).length;
-        return (
-          <section
-            key={s.aisle}
-            aria-label={s.label}
-            className="rounded-[24px] border-2 border-ink bg-paper px-2 pb-2 pt-3"
-          >
-            <h2 className="m-0 flex items-center gap-2 px-3 pb-1 font-display text-lg font-extrabold">
-              <span aria-hidden="true" className="-rotate-6 text-xl">
-                {AISLE_ICON[s.aisle]}
-              </span>
-              {s.label}
-              <span className="ml-auto text-[13px] font-bold text-muted">
-                {open ? `${open} left` : "✓ done"}
-              </span>
-            </h2>
-            <ul className="m-0 flex list-none flex-col p-0">
-              {sorted.map((item) => (
-                <Row
-                  key={item.key}
-                  item={item}
-                  checked={isChecked(item)}
-                  onToggle={() => toggle(item)}
-                  onRemove={item.extra ? () => void remove(item) : undefined}
-                  onHave={
-                    !item.extra
-                      ? () => void mark(item, "have")
-                      : undefined
-                  }
-                  firstName={firstName}
-                />
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+      {sections.length > 0 && (
+        // The list itself reads like a long receipt: one torn-edge strip, aisles split by dashed rules,
+        // and a tally at the bottom of what Chef got to share between meals.
+        <div className="receipt bg-paper px-2 pb-4">
+          {sections.map((s) => {
+            const sorted = [...s.items].sort(
+              (a, b) => Number(isChecked(a)) - Number(isChecked(b)),
+            );
+            const open = s.items.filter((i) => !isChecked(i)).length;
+            return (
+              <section
+                key={s.aisle}
+                aria-label={s.label}
+                className="border-t-[1.5px] border-dashed border-dash pb-1 pt-3 first:border-t-0 first:pt-0"
+              >
+                <h2 className="m-0 flex items-center gap-2 px-3 pb-1 text-[13px] font-extrabold tracking-[0.12em] text-muted">
+                  {s.label.toUpperCase()}
+                  <span className="ml-auto text-[13px] font-bold tracking-normal">
+                    {open ? `${open} left` : "✓ done"}
+                  </span>
+                </h2>
+                <ul className="m-0 flex list-none flex-col p-0">
+                  {sorted.map((item) => (
+                    <Row
+                      key={item.key}
+                      item={item}
+                      checked={isChecked(item)}
+                      onToggle={() => toggle(item)}
+                      onRemove={item.extra ? () => void remove(item) : undefined}
+                      onHave={
+                        !item.extra
+                          ? () => void mark(item, "have")
+                          : undefined
+                      }
+                      firstName={firstName}
+                    />
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+          <SharedTally items={all} />
+        </div>
+      )}
 
       {have.length > 0 && (
         <details className="group rounded-[24px] border-2 border-dashed border-dash bg-cream px-2 pb-2 pt-3 open:border-solid open:border-ink open:bg-paper">
@@ -601,7 +629,7 @@ export function GroceryListView({
             autoComplete="off"
             enterKeyHint="done"
             placeholder="Add something else, like paper towels"
-            className="min-h-[52px] min-w-0 flex-1 rounded-[26px] border-2 border-ink bg-paper px-5 text-base"
+            className="min-h-[52px] min-w-0 flex-1 rounded-[26px] border-2 border-crust bg-paper px-5 text-base focus:border-ink"
           />
           <button
             type="submit"

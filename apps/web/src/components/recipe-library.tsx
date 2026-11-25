@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { RecipeCard } from "@/lib/recipes";
 import { countTags, tagKey } from "@/lib/tags";
+import { DishPlaceholder } from "./dish-art";
 
-const TINTS = ["#f0b98a", "#9fcb8a", "#f2cf78", "#bfd48e", "#e7d3b0"];
 
 /** Square recipe cards with a search box and cuisine chips. */
 export function RecipeLibrary({ recipes }: { recipes: RecipeCard[] }) {
@@ -54,16 +54,18 @@ export function RecipeLibrary({ recipes }: { recipes: RecipeCard[] }) {
         <p className="text-muted">No recipes match that.</p>
       ) : (
         <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-5">
-          {shown.map((r, i) => (
+          {shown.map((r) => (
             <li key={r.id}>
               <Link
                 href={`/recipes/${r.id}`}
                 className="group block overflow-hidden rounded-2xl border-2 border-ink bg-paper text-ink no-underline transition-[translate,box-shadow] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0_var(--color-ink)] motion-reduce:transition-none"
               >
-                <div className="relative aspect-square" style={{ background: TINTS[i % TINTS.length] }}>
-                  {r.photoUrl && (
+                <div className="relative aspect-square">
+                  {r.photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- signed URLs from a private bucket
                     <img src={r.photoUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                  ) : (
+                    <DishPlaceholder seed={r.id} />
                   )}
                   {r.tags[0] && (
                     <span className="absolute left-2 top-2 rounded-full bg-ink px-2 py-0.5 text-[11px] font-bold text-cream">
