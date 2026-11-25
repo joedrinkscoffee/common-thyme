@@ -5,6 +5,7 @@ import { dueReminder, unmarked } from "./chef/check-in";
 import { buildReminderEmail } from "./chef/reminder-email";
 import { SupabaseChefStore } from "./chef/supabase-store";
 import { signCheckIn } from "./check-in-link";
+import { firstNameOf } from "./supabase/rows";
 
 export function appUrl(): string {
   const explicit = process.env.APP_URL?.replace(/\/$/, "");
@@ -100,7 +101,7 @@ export async function runReminders(admin: SupabaseClient, secret: string, now = 
         const title = (id: string) => catalog.find((r) => r.id === id)?.title ?? "A dinner";
         const email = buildReminderEmail({
           kind: due.kind,
-          firstName: profile?.display_name?.split(" ")[0] ?? null,
+          firstName: firstNameOf(profile?.display_name),
           weekStart: due.weekStart,
           dinners: left.map((d) => ({ id: d.id, date: d.date, title: title(d.recipeId) })),
           link: (dinnerId, action) => `${base}/check-in?t=${signCheckIn({ dinnerId, userId: m.user_id, action }, secret, now.getTime())}`,

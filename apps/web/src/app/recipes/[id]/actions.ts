@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseEnv } from "@/lib/supabase/env";
 import { refresh } from "next/cache";
-import { isPhotoPathFor, photoPathFor } from "@/lib/recipe-photo";
+import { isPhotoPathFor, photoPathFor, PHOTO_TYPES } from "@/lib/recipe-photo";
 import type { RecipeEditInput } from "@/lib/recipe-edit";
 import { updateRecipe, type SaveResult } from "@/lib/recipe-save";
 
@@ -11,6 +11,7 @@ export type PhotoTarget = { ok: true; path: string } | { ok: false; error: strin
 
 /** Picks the storage path for a new photo, after checking the recipe is in the viewer's household. */
 export async function photoTarget(recipeId: string, contentType: string): Promise<PhotoTarget> {
+  if (!(PHOTO_TYPES as readonly string[]).includes(contentType)) return { ok: false, error: "Use a JPEG, PNG or WebP photo." };
   const supabase = await createClient();
   const { data: recipe } = await supabase.from("recipes").select("household_id").eq("id", recipeId).maybeSingle();
   if (!recipe) return { ok: false, error: "That recipe isn't in your household." };

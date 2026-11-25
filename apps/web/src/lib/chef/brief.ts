@@ -3,7 +3,7 @@
  * still needs using up, and the one thing to ask. Written in code, not by the
  * model, so opening the app costs nothing and is instant.
  */
-import { addDays, dayName, relativeDay, weekDates, weekRangeLabel, weekStartOf, weekdayIndex } from "./dates";
+import { addDays, relativeDay, weekDates, weekRangeLabel, weekStartOf, weekdayIndex } from "./dates";
 import type { DinnerStatus, MealType, PlanStatus } from "./store";
 import { holidayWeekName } from "./holidays";
 
@@ -153,9 +153,4 @@ export function buildBrief(opts: {
   suggestions.push("Add a recipe from a link");
 
   return { paragraphs, checkIn, suggestions: [...new Set(suggestions)].slice(0, 3) };
-}
-
-/** Day labels for every night in a week, for tile placeholders. */
-export function nightsOf(weekStart: string) {
-  return weekDates(weekStart).map((d) => ({ date: d, day: dayName(d, "short").toUpperCase() }));
 }

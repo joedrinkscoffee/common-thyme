@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeUnit, parseIngredientLine, type Unit } from "@/lib/ingredient-line";
 import { KID_FRIENDLY_TAG } from "@/lib/recipe-edit";
 import { countTags, tagKey, type TagCount } from "@/lib/tags";
+import { one, type One } from "@/lib/supabase/rows";
 
 export type RecipeCard = {
   id: string;
@@ -126,7 +127,7 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
     name: string | null;
     prep: string | null;
     ingredient_id: string | null;
-    ingredients: { perishable: boolean } | { perishable: boolean }[] | null;
+    ingredients: One<{ perishable: boolean }>;
   };
   type Step = { position: number; title: string | null; body: string };
   const lines = ((r.recipe_ingredients ?? []) as Line[]).sort((a, b) => a.position - b.position);
@@ -144,10 +145,7 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
     notes: r.notes,
     updatedAt: r.updated_at,
     archivedAt: r.archived_at,
-    ingredients: lines.map((l) => {
-      const ing = Array.isArray(l.ingredients) ? l.ingredients[0] : l.ingredients;
-      return lineFrom({ ...l, perishable: !!ing?.perishable });
-    }),
+    ingredients: lines.map((l) => lineFrom({ ...l, perishable: !!one(l.ingredients)?.perishable })),
     steps: steps.map((s) => ({ title: s.title, body: s.body })),
   };
 }

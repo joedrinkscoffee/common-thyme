@@ -5,6 +5,7 @@ import { getViewer } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { CHECK_IN_ACTIONS, type CheckInAction } from "@/lib/chef/check-in";
 import { performCheckIn } from "@/lib/chef/check-in-server";
+import { validTimeZone } from "@/lib/settings-shared";
 
 type Outcome = { ok: boolean; error?: string };
 
@@ -22,12 +23,7 @@ export async function checkInDinner(dinnerId: string, action: CheckInAction | "u
 
 /** Remembers the browser's time zone, so reminder emails arrive at the right local hour. */
 export async function saveTimezone(timeZone: string): Promise<Outcome> {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
-  } catch {
-    return { ok: false };
-  }
-  if (timeZone.length > 64) return { ok: false };
+  if (!validTimeZone(timeZone)) return { ok: false };
   const viewer = await getViewer();
   if (viewer.kind !== "signed-in") return { ok: false };
   const db = await createClient();

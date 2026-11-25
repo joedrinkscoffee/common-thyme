@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getViewer } from "@/lib/household";
-import { PHOTO_TYPES } from "@/lib/recipe-photo";
+import { readSentPhoto } from "@/lib/sent-photo";
+import { sameOrigin } from "@/lib/request-origin";
 import { chefConnected, chefContext } from "@/lib/chef/server";
 import { fetchRecipePage } from "@/lib/chef/fetch-page";
 import { listTags } from "@/lib/recipes";
@@ -9,7 +10,6 @@ import { addFromLink, addFromPhoto, type IntakeResult, type PhotoInput } from "@
 // Reading a long page or a photo can take a little while.
 export const maxDuration = 120;
 
-const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 // A ceiling on new recipes per household per day, which also caps what Claude can cost.
 const DAILY_RECIPES = 200;
 
@@ -20,27 +20,21 @@ const fail = (error: string, status = 400) => json({ status: "failed", error }, 
 
 /** Adds one recipe from a link or a photo. The Add recipes page calls this once per item. */
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (origin && host && new URL(origin).host !== host) return fail("Not allowed.", 403);
+  if (!sameOrigin(request)) return fail("Not allowed.", 403);
 
   const viewer = await getViewer();
   if (viewer.kind !== "signed-in" || !viewer.household) return fail("Sign in first.", 401);
 
-  let body: { url?: unknown; image?: { data?: unknown; type?: unknown } | null };
+  let body: { url?: unknown; image?: unknown };
   try {
     body = await request.json();
   } catch {
     return fail("Couldn't read that.");
   }
 
-  let photo: PhotoInput | null = null;
-  if (body.image && typeof body.image.data === "string" && typeof body.image.type === "string") {
-    if (!(PHOTO_TYPES as readonly string[]).includes(body.image.type)) return fail("Use a JPEG, PNG or WebP photo.");
-    const bytes = Uint8Array.from(Buffer.from(body.image.data, "base64"));
-    if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) return fail("That photo is too big.");
-    photo = { bytes, contentType: body.image.type as PhotoInput["contentType"] };
-  }
+  const sent = readSentPhoto(body.image);
+  if (sent && "error" in sent) return fail(sent.error);
+  const photo: PhotoInput | null = sent;
   const url = typeof body.url === "string" ? body.url.trim().slice(0, 2000) : "";
   if (!photo && !url) return fail("Send a link or a photo.");
   if (!chefConnected()) return fail("Recipe reading isn't switched on yet.", 503);

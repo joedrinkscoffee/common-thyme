@@ -1,21 +1,14 @@
 "use server";
 
-import { headers } from "next/headers";
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/household";
+import { requestOrigin } from "@/lib/request-origin";
 
 export type LinkResult = { ok: true; url: string } | { ok: false; error: string };
 
 const PEOPLE = new Set([1, 5, 25]);
 const DAYS = new Set([7, 14, 30]);
-
-async function origin() {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
-}
 
 /** Makes an invite link. Only admins can (row-level security checks too). */
 export async function createAccessLink(input: { label: string; people: number; days: number }): Promise<LinkResult> {
@@ -32,7 +25,7 @@ export async function createAccessLink(input: { label: string; people: number; d
     .single();
   if (error || !data) return { ok: false, error: "Couldn't make a link. Try again?" };
   refresh();
-  return { ok: true, url: `${await origin()}/join/${data.code}` };
+  return { ok: true, url: `${await requestOrigin()}/join/${data.code}` };
 }
 
 export async function revokeAccessLink(id: string): Promise<void> {

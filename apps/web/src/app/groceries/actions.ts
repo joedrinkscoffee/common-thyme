@@ -1,7 +1,7 @@
 "use server";
 
 import { getViewer } from "@/lib/household";
-import { chefContext } from "@/lib/chef/server";
+import { householdStore } from "@/lib/chef/server";
 import { isIsoDate, weekdayIndex } from "@/lib/chef/dates";
 import { defaultAisle } from "@/lib/grocery/aisles";
 
@@ -11,7 +11,7 @@ async function storeFor(weekStart: string) {
   if (!isIsoDate(weekStart) || weekdayIndex(weekStart) !== 0) return null;
   const viewer = await getViewer();
   if (viewer.kind !== "signed-in" || !viewer.household) return null;
-  const { store } = await chefContext({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
+  const { store } = await householdStore({ userId: viewer.userId, firstName: viewer.firstName, household: viewer.household });
   return store;
 }
 
