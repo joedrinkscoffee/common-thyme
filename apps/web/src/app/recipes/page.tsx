@@ -26,10 +26,10 @@ async function Library({ searchParams }: { searchParams: Promise<Record<string, 
     return (
       <div className="rounded-[22px] border-2 border-dashed border-dash px-6 py-12 text-center">
         <p className="m-0 font-display text-2xl font-extrabold">No recipes yet</p>
-        <p className="mb-5 mt-1 text-muted">Bring in everything from Airtable and ReciMe in one go.</p>
+        <p className="mb-5 mt-1 text-muted">Paste links, upload your bookmarks or snap a cookbook page.</p>
         {sticker}
         <Link href="/recipes/import" className="inline-flex min-h-11 items-center rounded-full bg-tomato px-5 font-bold text-white no-underline">
-          Import recipes
+          Add recipes
         </Link>
       </div>
     );
@@ -55,7 +55,7 @@ export default function RecipesPage(props: PageProps<"/recipes">) {
               Tags
             </Link>
             <Link href="/recipes/import" className="rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-bold text-ink no-underline transition-colors hover:bg-lemon">
-              Import
+              Add recipes
             </Link>
           </div>
         </div>

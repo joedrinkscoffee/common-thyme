@@ -16,6 +16,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Common Thyme",
   description: "Chef plans your week of dinners so the groceries carry across nights.",
+  // Name under the icon when added to an iPhone home screen (otherwise iOS uses the page title).
+  // Set directly rather than via appleWebApp, which would also make the home-screen app
+  // open full-screen without Safari's bar.
+  other: { "apple-mobile-web-app-title": "Common Thyme" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPhotoPathFor, photoPathFor } from "./recipe-photo";
+import { isPhotoPathFor, photoPathFor, photoExtension } from "./recipe-photo";
 
 const hh = "11111111-1111-1111-1111-111111111111";
 const id = "22222222-2222-2222-2222-222222222222";
@@ -16,5 +16,14 @@ describe("recipe photo paths", () => {
     expect(isPhotoPathFor(`${hh}/33333333-3333-3333-3333-333333333333.jpg`, hh, id)).toBe(false);
     expect(isPhotoPathFor(`${hh}/${id}-1/../x.jpg`, hh, id)).toBe(false);
     expect(isPhotoPathFor(`other/${id}.jpg`, hh, id)).toBe(false);
+  });
+});
+
+describe("photoExtension", () => {
+  it("maps photo types and ignores the rest", () => {
+    expect(photoExtension("image/jpeg; charset=binary")).toBe("jpg");
+    expect(photoExtension("image/webp")).toBe("webp");
+    expect(photoExtension("application/pdf")).toBeNull();
+    expect(photoExtension(null)).toBeNull();
   });
 });

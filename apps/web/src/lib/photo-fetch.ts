@@ -1,5 +1,5 @@
 import "server-only";
-import { photoExtension } from "@/lib/recipe-import";
+import { photoExtension } from "@/lib/recipe-photo";
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
