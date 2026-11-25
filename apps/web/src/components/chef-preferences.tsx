@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { addPreference, forgetPreference, savePlanning, type PlanningInput, type Result } from "@/app/settings/actions";
+import { addPreference, forgetPreference, savePlanning, type PlanningInput, type Result } from "@/app/what-chef-knows/actions";
 import { SettingsCard } from "@/components/settings-card";
-import { timeZoneOptions } from "@/lib/settings-shared";
 
 export type Preference = { id: string; body: string };
 
@@ -31,7 +30,7 @@ function Stepper({ label, hint, value, min, max, onChange, unit }: { label: stri
   );
 }
 
-function HowChefPlans({ initial, sample }: { initial: PlanningInput; sample: boolean }) {
+export function HowChefPlans({ initial, sample }: { initial: PlanningInput; sample: boolean }) {
   const [v, setV] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -73,21 +72,6 @@ function HowChefPlans({ initial, sample }: { initial: PlanningInput; sample: boo
           onChange={(n) => set({ noRepeatWeeks: n })}
           unit={(n) => (n === 0 ? "Off" : `${n} wk`)}
         />
-        <label className="flex flex-col gap-1.5 rounded-2xl bg-sand px-4 py-3">
-          <span className="font-semibold">Household time zone</span>
-          <span className="text-sm text-muted">Decides what &ldquo;today&rdquo; and &ldquo;this week&rdquo; mean for Chef.</span>
-          <select
-            value={v.timezone}
-            onChange={(e) => set({ timezone: e.target.value })}
-            className="mt-1 min-h-11 w-full rounded-xl border-2 border-ink bg-paper px-3 text-ink focus:shadow-pop-sm focus:outline-none"
-          >
-            {timeZoneOptions(v.timezone).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <button
             type="submit"
@@ -105,7 +89,7 @@ function HowChefPlans({ initial, sample }: { initial: PlanningInput; sample: boo
   );
 }
 
-function FoodPreferences({ initial, sample }: { initial: Preference[]; sample: boolean }) {
+export function FoodPreferences({ initial, sample }: { initial: Preference[]; sample: boolean }) {
   const [text, setText] = useState("");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -117,7 +101,11 @@ function FoodPreferences({ initial, sample }: { initial: Preference[]; sample: b
     });
   return (
     <SettingsCard title="Food preferences" hint="Diets, allergies and things you don't eat. Chef plans around them every week.">
-      {initial.length > 0 && (
+      {initial.length === 0 ? (
+        <p className="m-0 mb-3 rounded-2xl border-2 border-dashed border-dash px-4 py-3 text-[15px] text-muted">
+          Nothing yet. Add one here, or just tell Chef in the chat (&ldquo;Sam doesn&apos;t eat mushrooms&rdquo;) and it shows up here.
+        </p>
+      ) : (
         <ul className="m-0 mb-3 flex list-none flex-col gap-2 p-0">
           {initial.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 rounded-2xl bg-sand px-4 py-2">
@@ -167,11 +155,4 @@ function FoodPreferences({ initial, sample }: { initial: Preference[]; sample: b
   );
 }
 
-export function PlanningSettings({ planning, preferences, sample }: { planning: PlanningInput; preferences: Preference[]; sample: boolean }) {
-  return (
-    <>
-      <HowChefPlans initial={planning} sample={sample} />
-      <FoodPreferences initial={preferences} sample={sample} />
-    </>
-  );
-}
+

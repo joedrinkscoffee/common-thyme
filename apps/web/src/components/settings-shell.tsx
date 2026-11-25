@@ -4,13 +4,12 @@ import { SiteHeader } from "@/components/site-header";
 const TABS = [
   { key: "account", href: "/settings", label: "Account" },
   { key: "household", href: "/settings/household", label: "Household" },
-  { key: "planning", href: "/settings/planning", label: "Planning" },
   { key: "tags", href: "/settings/tags", label: "Tags" },
 ] as const;
 
 export type SettingsTab = (typeof TABS)[number]["key"];
 
-/** The Settings frame: header, title and the tab row (four equal tabs on a phone). */
+/** The Settings frame: header, title and the tab row (three equal tabs on a phone). */
 export function SettingsShell({ tab, children }: { tab: SettingsTab; children: React.ReactNode }) {
   return (
     <>
@@ -18,7 +17,7 @@ export function SettingsShell({ tab, children }: { tab: SettingsTab; children: R
       <main className="mx-auto w-full max-w-[720px] flex-1 px-4 pb-32 sm:px-6">
         <h1 className="mb-4 mt-2 font-display text-4xl font-extrabold tracking-tight">Settings</h1>
         <nav aria-label="Settings" className="mb-6">
-          <ul className="m-0 grid list-none grid-cols-4 gap-1.5 p-0 sm:flex sm:gap-2">
+          <ul className="m-0 grid list-none grid-cols-3 gap-1.5 p-0 sm:flex sm:gap-2">
             {TABS.map((t) => (
               <li key={t.key}>
                 <Link

@@ -132,74 +132,18 @@ export async function leaveHousehold(): Promise<Result> {
   redirect("/");
 }
 
-// ---------------------------------------------------------------------------
-// Planning
-// ---------------------------------------------------------------------------
-
-export type PlanningInput = {
-  mealsPerWeek: number;
-  baseServings: number;
-  kidsExtraServings: number;
-  noRepeatWeeks: number;
-  timezone: string;
-};
-
-const inRange = (n: unknown, lo: number, hi: number) => typeof n === "number" && Number.isInteger(n) && n >= lo && n <= hi;
-
-export async function savePlanning(input: PlanningInput): Promise<Result> {
+/** The household's time zone: what "today" and "this week" mean for Chef. */
+export async function saveHouseholdTimezone(timezone: string): Promise<Result> {
   const m = await household();
   if (m.fail) return m.fail;
-  if (
-    !inRange(input?.mealsPerWeek, 1, 7) ||
-    !inRange(input.baseServings, 1, 12) ||
-    !inRange(input.kidsExtraServings, 0, 12) ||
-    !inRange(input.noRepeatWeeks, 0, 12) ||
-    !validTimeZone(input.timezone)
-  ) {
-    return { ok: false, error: "One of those values is out of range." };
-  }
+  if (!validTimeZone(timezone)) return { ok: false, error: "Pick a time zone from the list." };
   const { error } = await m.db
     .from("household_settings")
-    .update({
-      dinners_per_week: input.mealsPerWeek,
-      base_servings: input.baseServings,
-      kids_extra_servings: input.kidsExtraServings,
-      no_repeat_weeks: input.noRepeatWeeks,
-      timezone: input.timezone,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ timezone, updated_at: new Date().toISOString() })
     .eq("household_id", m.household.id);
   if (error) return { ok: false, error: "That didn't save. Try again?" };
   refresh();
-  return { ok: true, message: "Saved. Chef uses this next time it plans." };
-}
-
-/** A food preference (diet, allergy, dislike) Chef keeps in mind, same as telling it in the chat. */
-export async function addPreference(body: string): Promise<Result> {
-  const m = await household();
-  if (m.fail) return m.fail;
-  const clean = String(body ?? "").replace(/\s+/g, " ").trim();
-  if (!clean) return { ok: false, error: "Write the preference first." };
-  if (clean.length > 200) return { ok: false, error: "Keep it under 200 characters." };
-  const { error } = await m.db.from("chef_notes").insert({
-    household_id: m.household.id,
-    source: "you_said",
-    category: "tastes",
-    body: clean,
-    created_by: m.viewer.userId,
-  });
-  if (error) return { ok: false, error: "That didn't save. Try again?" };
-  refresh();
-  return { ok: true, message: "Chef will keep that in mind." };
-}
-
-export async function forgetPreference(noteId: string): Promise<Result> {
-  const m = await household();
-  if (m.fail) return m.fail;
-  const { error } = await m.db.from("chef_notes").update({ active: false }).eq("id", String(noteId)).eq("household_id", m.household.id);
-  if (error) return { ok: false, error: "Couldn't remove that. Try again?" };
-  refresh();
-  return { ok: true };
+  return { ok: true, message: "Saved." };
 }
 
 // ---------------------------------------------------------------------------

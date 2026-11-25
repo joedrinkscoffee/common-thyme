@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: "Household · Settings · Common Thym
 
 const SAMPLE: HouseholdView = {
   name: "The Sample Kitchen",
+  timezone: "America/New_York",
   youOwn: true,
   sample: true,
   members: [
@@ -28,7 +29,7 @@ async function Household() {
 
   const db = await createClient();
   const hid = viewer.household.id;
-  const [{ data: members }, { data: invites }] = await Promise.all([
+  const [{ data: members }, { data: invites }, { data: settings }] = await Promise.all([
     db.from("household_members").select("user_id, role, joined_at, profiles(display_name, avatar_url)").eq("household_id", hid).order("joined_at"),
     db
       .from("household_invites")
@@ -37,6 +38,7 @@ async function Household() {
       .is("accepted_at", null)
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false }),
+    db.from("household_settings").select("timezone").eq("household_id", hid).maybeSingle(),
   ]);
   type Row = { user_id: string; role: "owner" | "member"; joined_at: string; profiles: { display_name: string | null; avatar_url: string | null } | { display_name: string | null; avatar_url: string | null }[] | null };
   const rows: MemberView[] = ((members ?? []) as Row[]).map((m) => {
@@ -54,6 +56,7 @@ async function Household() {
     <HouseholdSettings
       view={{
         name: viewer.household.name,
+        timezone: (settings?.timezone as string | undefined) || "America/New_York",
         members: rows,
         invites: (invites ?? []).map((i) => ({ id: i.id as string, expiresAt: i.expires_at as string })),
         youOwn: rows.some((m) => m.isYou && m.role === "owner"),

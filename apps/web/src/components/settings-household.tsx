@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { createInvite } from "@/app/actions";
-import { leaveHousehold, removeMember, renameHousehold, revokeInvite, type Result } from "@/app/settings/actions";
+import { leaveHousehold, removeMember, renameHousehold, revokeInvite, saveHouseholdTimezone, type Result } from "@/app/settings/actions";
+import { timeZoneOptions } from "@/lib/settings-shared";
 import { SettingsCard } from "@/components/settings-card";
 
 export type MemberView = { userId: string; name: string; avatarUrl: string | null; role: "owner" | "member"; joinedAt: string; isYou: boolean };
 export type PendingInvite = { id: string; expiresAt: string };
-export type HouseholdView = { name: string; members: MemberView[]; invites: PendingInvite[]; youOwn: boolean; sample: boolean };
+export type HouseholdView = { name: string; timezone: string; members: MemberView[]; invites: PendingInvite[]; youOwn: boolean; sample: boolean };
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -274,12 +275,54 @@ function Invite({ view }: { view: HouseholdView }) {
   );
 }
 
+function TimeZone({ view }: { view: HouseholdView }) {
+  const [tz, setTz] = useState(view.timezone);
+  const [saved, setSaved] = useState(view.timezone);
+  const { note, pending, run } = useAction();
+  return (
+    <SettingsCard title="Time zone" hint="Decides what “today” and “this week” mean for Chef. Each person's check-in emails follow their own phone or computer.">
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          run(() => saveHouseholdTimezone(tz), () => setSaved(tz));
+        }}
+      >
+        <label htmlFor="household-tz" className="sr-only">
+          Household time zone
+        </label>
+        <select
+          id="household-tz"
+          value={tz}
+          onChange={(e) => setTz(e.target.value)}
+          className="min-h-11 min-w-0 flex-1 basis-48 rounded-xl border-2 border-ink bg-paper px-3 text-ink focus:shadow-pop-sm focus:outline-none"
+        >
+          {timeZoneOptions(view.timezone).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          disabled={pending || tz === saved || view.sample}
+          className="min-h-11 rounded-full bg-tomato px-5 font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+      </form>
+      <Status note={note} />
+    </SettingsCard>
+  );
+}
+
 export function HouseholdSettings({ view }: { view: HouseholdView }) {
   return (
     <>
       <Members view={view} />
       <Invite view={view} />
       <Name view={view} />
+      <TimeZone view={view} />
     </>
   );
 }
