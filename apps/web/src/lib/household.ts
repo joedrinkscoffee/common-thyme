@@ -12,8 +12,8 @@ export type Viewer =
       kind: "signed-in";
       userId: string;
       firstName: string | null;
-      /** Runs the app: can make invite links. */
-      isOwner: boolean;
+      /** Flagged as an admin in the database: sees the Admin page. */
+      isAdmin: boolean;
       household: { id: string; name: string; memberCount: number } | null;
     };
 
@@ -45,11 +45,11 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer> {
   ]);
 
   // The database enforces this too; this only picks the page to show.
-  if (access !== "owner" && access !== "allowed") {
+  if (access !== "admin" && access !== "allowed") {
     return { kind: "no-access", userId: claims.sub, firstName, email: typeof claims.email === "string" ? claims.email : null };
   }
-  const isOwner = access === "owner";
-  if (!membership) return { kind: "signed-in", userId: claims.sub, firstName, isOwner, household: null };
+  const isAdmin = access === "admin";
+  if (!membership) return { kind: "signed-in", userId: claims.sub, firstName, isAdmin, household: null };
 
   const { count } = await supabase
     .from("household_members")
@@ -63,7 +63,7 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer> {
     kind: "signed-in",
     userId: claims.sub,
     firstName,
-    isOwner,
+    isAdmin,
     household: { id: membership.household_id, name: name ?? "Your household", memberCount: count ?? 1 },
   };
 });

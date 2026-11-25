@@ -17,10 +17,10 @@ async function origin() {
   return `${proto}://${host}`;
 }
 
-/** Makes an invite link. Only the app's owner can (row-level security checks too). */
+/** Makes an invite link. Only admins can (row-level security checks too). */
 export async function createAccessLink(input: { label: string; people: number; days: number }): Promise<LinkResult> {
   const viewer = await getViewer();
-  if (viewer.kind !== "signed-in" || !viewer.isOwner) return { ok: false, error: "Only the app's owner can make invite links." };
+  if (viewer.kind !== "signed-in" || !viewer.isAdmin) return { ok: false, error: "Only admins can make invite links." };
   const label = input.label.trim().slice(0, 80) || null;
   const people = PEOPLE.has(input.people) ? input.people : 1;
   const days = DAYS.has(input.days) ? input.days : 14;
@@ -37,7 +37,7 @@ export async function createAccessLink(input: { label: string; people: number; d
 
 export async function revokeAccessLink(id: string): Promise<void> {
   const viewer = await getViewer();
-  if (viewer.kind !== "signed-in" || !viewer.isOwner) return;
+  if (viewer.kind !== "signed-in" || !viewer.isAdmin) return;
   const supabase = await createClient();
   await supabase.from("access_links").update({ revoked_at: new Date().toISOString() }).eq("id", id).is("revoked_at", null);
   refresh();
@@ -46,8 +46,28 @@ export async function revokeAccessLink(id: string): Promise<void> {
 /** Takes someone off the list. Their household's data stays, but they can't open it. */
 export async function removeAccess(email: string): Promise<void> {
   const viewer = await getViewer();
-  if (viewer.kind !== "signed-in" || !viewer.isOwner) return;
+  if (viewer.kind !== "signed-in" || !viewer.isAdmin) return;
   const supabase = await createClient();
   await supabase.from("app_access").delete().eq("email", email.toLowerCase());
   refresh();
+}
+
+export type LimitResult = { ok: true; limit: number } | { ok: false; error: string };
+
+/** The most messages one household can send Chef in 24 hours. */
+export async function setChefDailyLimit(limit: number): Promise<LimitResult> {
+  const viewer = await getViewer();
+  if (viewer.kind !== "signed-in" || !viewer.isAdmin) return { ok: false, error: "Only admins can change this." };
+  const n = Math.round(Number(limit));
+  if (!Number.isFinite(n) || n < 1 || n > 1000) return { ok: false, error: "Pick a number from 1 to 1,000." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("app_settings")
+    .update({ chef_daily_limit: n, updated_at: new Date().toISOString() })
+    .eq("id", true)
+    .select("chef_daily_limit")
+    .single();
+  if (error || !data) return { ok: false, error: "Couldn't save that. Try again?" };
+  refresh();
+  return { ok: true, limit: data.chef_daily_limit };
 }
