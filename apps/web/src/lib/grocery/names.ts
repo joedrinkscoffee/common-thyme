@@ -33,12 +33,14 @@ const SALT_PEPPER = /^(salt|pepper|black pepper|ground pepper|white pepper|sea s
 function stripLeftovers(name: string): string {
   let n = name.trim().toLowerCase();
   for (let i = 0; i < 3; i++) {
-    const m = n.match(/^(plus|and|additional|extra|more|about|or|optional:?)\s+(.*)$/);
+    const m = n.match(/^(plus|and|additional|extra(?! virgin)|more|about|or|optional:?)\s+(.*)$/);
     if (!m) break;
     n = m[2];
     const again = parseIngredientLine(n);
     if (again.name && again.name !== n) n = again.name;
   }
+  // "1 inch fresh ginger" reads as an inch of something: drop the size.
+  n = n.replace(/^([0-9/. ]+)?-?inch(es)?\s+(pieces?\s+)?(of\s+)?/, "");
   return n.replace(/\s*\(.*?\)\s*/g, " ").replace(/,.*$/, "").replace(/\s+/g, " ").trim();
 }
 
@@ -64,8 +66,18 @@ export function shoppingName(written: string): string {
     const special = SPECIAL_MUSHROOMS.find((s) => key.includes(s));
     return special ? `${special.replace("lion s", "lion's")} mushrooms` : "mushrooms";
   }
+  // Baby greens are the same thing to shop for: baby spinach is spinach.
+  if (/^baby (spinach|kale|arugula|bok choy|chard|greens?)$/.test(key)) return n.replace(/^baby[\s-]+/, "");
   if (/^(shiitake|cremini|crimini|button)$/.test(key)) return key === "shiitake" ? "shiitake mushrooms" : "mushrooms";
   return n;
+}
+
+/**
+ * Never on the list: every kitchen has salt & pepper and extra virgin olive
+ * oil (Joe, 2026-11-23). Takes a name from shoppingName.
+ */
+export function alwaysOnHand(name: string): boolean {
+  return name === "salt & pepper" || /^((extra )?virgin )?olive oil$|^evoo$/.test(matchKey(name));
 }
 
 /** What to buy for one recipe line: usually one thing, a few for a combo like aromatics. */

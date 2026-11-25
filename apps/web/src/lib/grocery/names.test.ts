@@ -7,7 +7,7 @@ describe("shoppingName", () => {
     ["cremini mushrooms", "mushrooms"], ["baby bella mushrooms", "mushrooms"], ["button mushrooms", "mushrooms"], ["shiitake mushrooms", "shiitake mushrooms"],
     ["oyster mushrooms", "oyster mushrooms"], ["kosher salt", "salt & pepper"], ["salt and pepper", "salt & pepper"], ["black pepper", "salt & pepper"],
     ["freshly ground black pepper", "salt & pepper"], ["plus 1/8 teaspoon salt", "salt & pepper"], ["low-sodium soy sauce", "soy sauce"],
-    ["organic baby spinach", "baby spinach"], ["carrots", "carrots"], ["fresh ginger", "ginger"], ["red bell pepper", "red bell pepper"],
+    ["organic baby spinach", "spinach"], ["baby kale", "kale"], ["baby back ribs", "baby back ribs"], ["carrots", "carrots"], ["fresh ginger", "ginger"], ["1-inch piece fresh ginger", "ginger"], ["extra virgin olive oil", "extra virgin olive oil"], ["red bell pepper", "red bell pepper"],
   ])("%s → %s", (written, want) => {
     expect(shoppingName(written)).toBe(want);
   });

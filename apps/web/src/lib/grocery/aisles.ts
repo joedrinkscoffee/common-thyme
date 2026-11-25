@@ -190,7 +190,7 @@ export function shopAisle(name: string, override?: string | null): Aisle {
 }
 
 // Things that keep and get used across many meals, so you likely have some: worth asking before you shop.
-const MULTI_USE = ["egg", "parmesan", "parmigiano", "pecorino", "romano", "grana padano", "cheddar"];
+const MULTI_USE = ["egg", "ginger", "parmesan", "parmigiano", "pecorino", "romano", "grana padano", "cheddar"];
 const ON_HAND_AISLES: Aisle[] = ["staples", "pantry", "international", "baking", "grains", "nuts"];
 
 /** True for pantry and multi-use items you might already have: soy sauce, jasmine rice, chili paste, eggs. */
