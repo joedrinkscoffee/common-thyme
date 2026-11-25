@@ -22,7 +22,7 @@ function SignOut() {
 const ON = "rounded-full bg-ink px-3.5 py-2 font-semibold text-cream no-underline";
 const OFF = "rounded-full px-3.5 py-2 font-semibold text-ink no-underline transition-colors hover:bg-lemon";
 
-type Section = "chef" | "recipes" | "groceries" | "knows" | "invites";
+type Section = "chef" | "recipes" | "groceries" | "knows" | "admin";
 
 const PAGES: { key: Section; href: string; label: string }[] = [
   { key: "chef", href: "/", label: "Chef" },
@@ -32,37 +32,37 @@ const PAGES: { key: Section; href: string; label: string }[] = [
 ];
 
 /**
- * Only the app's owner sees this. It sits beside the logo (not in the nav), so
+ * Only admins see this (the database decides who is one). It sits beside the logo (not in the nav), so
  * it can stream in after first paint without moving anything.
  */
-async function OwnerLink({ active, variant }: { active: boolean; variant: "desktop" | "mobile" }) {
+async function AdminLink({ active, variant }: { active: boolean; variant: "desktop" | "mobile" }) {
   const viewer = await getViewer();
-  if (viewer.kind !== "signed-in" || !viewer.isOwner) return null;
+  if (viewer.kind !== "signed-in" || !viewer.isAdmin) return null;
   if (variant === "mobile") {
     return (
       <Link
-        href="/invites"
+        href="/admin"
         aria-current={active ? "page" : undefined}
         className={[
           "flex items-center justify-between rounded-xl px-4 py-3 text-lg font-semibold no-underline",
           active ? "bg-ink text-cream" : "text-ink transition-colors hover:bg-lemon focus-visible:bg-lemon",
         ].join(" ")}
       >
-        Invites
+        Admin
         {active && <span className="text-sm font-medium text-cream/70">You&rsquo;re here</span>}
       </Link>
     );
   }
   return (
     <Link
-      href="/invites"
+      href="/admin"
       aria-current={active ? "page" : undefined}
       className={[
         "hidden rounded-full border-2 border-ink px-3 py-1 text-sm font-bold no-underline shadow-pop-sm md:inline-block",
         active ? "bg-ink text-cream" : "bg-lemon text-ink hover:bg-caper",
       ].join(" ")}
     >
-      Invites
+      Admin
     </Link>
   );
 }
@@ -79,7 +79,7 @@ export function SiteHeader({ active = "chef" }: { active?: Section }) {
         </Link>
         {showSignOut && (
           <Suspense fallback={null}>
-            <OwnerLink active={active === "invites"} variant="desktop" />
+            <AdminLink active={active === "admin"} variant="desktop" />
           </Suspense>
         )}
       </div>
@@ -97,7 +97,7 @@ export function SiteHeader({ active = "chef" }: { active?: Section }) {
         extra={
           showSignOut ? (
             <Suspense fallback={null}>
-              <OwnerLink active={active === "invites"} variant="mobile" />
+              <AdminLink active={active === "admin"} variant="mobile" />
             </Suspense>
           ) : null
         }

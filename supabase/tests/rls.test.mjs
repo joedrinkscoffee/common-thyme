@@ -12,7 +12,7 @@ const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migra
 const SUPABASE_STUBS = `
   create role anon; create role authenticated;
   create schema auth;
-  create table auth.users (id uuid primary key, raw_user_meta_data jsonb, email text, created_at timestamptz not null default now());
+  create table auth.users (id uuid primary key, raw_user_meta_data jsonb, email text, created_at timestamptz not null default now(), last_sign_in_at timestamptz);
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   grant usage on schema auth to authenticated;
@@ -48,7 +48,7 @@ async function setup() {
     ('${STRANGER}', '{}', 'stranger@example.com'), ('${NEWCOMER}', '{}', 'New.Comer@Example.com'), ('${FRIEND}', '{}', 'friend@example.com')`);
   // Joe runs the app; the "stranger" is another invited household.
   await db.exec(`insert into public.app_access (email, via) values ('joe@example.com', 'existing'), ('stranger@example.com', 'existing');
-    insert into public.app_owners (user_id) values ('${JOE}')`);
+    insert into public.app_admins (user_id) values ('${JOE}')`);
   const as = async (uid, sql) => {
     await db.exec(`reset role; select set_config('test.uid', '${uid}', false); set role authenticated;`);
     return (await db.query(sql)).rows;
@@ -264,7 +264,7 @@ test("grocery items can be marked as on hand or needed", async () => {
 test("people who aren't invited can sign in but can't make a household", async () => {
   const { as } = await setup();
   assert.equal((await as(NEWCOMER, "select public.my_app_access() as a"))[0].a, null);
-  assert.equal((await as(JOE, "select public.my_app_access() as a"))[0].a, "owner");
+  assert.equal((await as(JOE, "select public.my_app_access() as a"))[0].a, "admin");
   assert.equal((await as(STRANGER, "select public.my_app_access() as a"))[0].a, "allowed");
   await assert.rejects(as(NEWCOMER, `select public.create_household('Mine')`), /invite_only/);
   await assert.rejects(as(NEWCOMER, `insert into public.app_access (email, via) values ('new.comer@example.com', 'link')`), /permission denied/);
@@ -295,17 +295,18 @@ test("an invite link lets new people in until it runs out, expires or is revoked
   await assert.rejects(as(FRIEND, `select public.redeem_access_link('nope')`), /invite_link_invalid/);
 });
 
-test("only the owner sees and manages invite links and the access list", async () => {
+test("only admins see and manage invite links and the access list", async () => {
   const { as } = await setup();
   await as(JOE, `insert into public.access_links (label) values ('x')`);
   assert.equal((await as(STRANGER, "select count(*)::int as n from public.access_links"))[0].n, 0);
   assert.equal((await as(STRANGER, "select count(*)::int as n from public.app_access"))[0].n, 0);
   assert.equal((await as(JOE, "select count(*)::int as n from public.app_access"))[0].n, 2);
   await assert.rejects(as(STRANGER, `insert into public.access_links (label) values ('mine')`), /row-level security/);
-  await assert.rejects(as(NEWCOMER, "select * from public.app_owners"), /permission denied/);
-  // The owner can't lock themselves out.
+  await assert.rejects(as(NEWCOMER, "select * from public.app_admins"), /permission denied/);
+  await assert.rejects(as(STRANGER, `insert into public.app_admins (user_id) values ('${STRANGER}')`), /permission denied/);
+  // An admin can't lock themselves out.
   await as(JOE, "delete from public.app_access where email = 'joe@example.com'");
-  assert.equal((await as(JOE, "select public.my_app_access() as a"))[0].a, "owner");
+  assert.equal((await as(JOE, "select public.my_app_access() as a"))[0].a, "admin");
 });
 
 test("a partner invite lets someone new in, and taking access away closes the household", async () => {
@@ -323,7 +324,7 @@ test("a partner invite lets someone new in, and taking access away closes the ho
   assert.equal((await as(JOE, "select count(*)::int as n from public.recipes"))[0].n, 1);
 });
 
-test("everyone already signed up keeps access, and the first one is the owner", async () => {
+test("everyone already signed up keeps access, and the first one becomes the admin", async () => {
   await previous?.close();
   const db = new PGlite();
   previous = db;
@@ -336,8 +337,9 @@ test("everyone already signed up keeps access, and the first one is the owner", 
   for (const file of files.slice(gate)) await db.exec(readFileSync(join(migrationsDir, file), "utf8"));
   const { rows: list } = await db.query("select email, via from public.app_access order by email");
   assert.deepEqual(list, [{ email: "joe@example.com", via: "existing" }, { email: "partner@example.com", via: "existing" }]);
-  const { rows: owners } = await db.query("select user_id from public.app_owners");
-  assert.deepEqual(owners, [{ user_id: JOE }]);
+  const { rows: admins } = await db.query("select user_id from public.app_admins");
+  assert.deepEqual(admins, [{ user_id: JOE }]);
+  assert.equal((await db.query("select to_regclass('public.app_owners') as t")).rows[0].t, null);
 });
 
 test("meals and ingredient lines can't point at another household's rows", async () => {
@@ -366,4 +368,41 @@ test("meals and ingredient lines can't point at another household's rows", async
   await as(JOE, `insert into public.recipe_ingredients (recipe_id, ingredient_id, position, raw_text) values ('${myRecipe.id}', null, 0, 'salt')`);
   // The other household can still erase its recipe.
   await as(STRANGER, `delete from public.recipes where id = '${theirRecipe.id}'`);
+});
+
+test("admins see households as counts and dates, and nobody else sees them", async () => {
+  const { as } = await setup();
+  const [{ id: mine }] = await as(JOE, `select public.create_household('Home') as id`);
+  const [{ id: theirs }] = await as(STRANGER, `select public.create_household('Other') as id`);
+  await as(STRANGER, `insert into public.recipes (household_id, title) values ('${theirs}', 'Secret stew')`);
+  await as(STRANGER, `insert into public.chef_messages (household_id, role, author_id, body) values ('${theirs}', 'user', '${STRANGER}', 'plan my week')`);
+  await as(STRANGER, `insert into public.chef_messages (household_id, role, body, payload)
+    values ('${theirs}', 'chef', 'done', '{"usage":{"input":1000,"cacheRead":5000,"cacheWrite":200,"output":300,"calls":2}}')`);
+
+  const rows = await as(JOE, "select * from public.admin_households()");
+  assert.deepEqual(rows.map((r) => r.id), [mine, theirs]);
+  const other = rows[1];
+  assert.equal(other.recipes, 1);
+  assert.equal(other.chef_today, 1);
+  assert.equal(other.chef_month, 1);
+  assert.deepEqual(other.usage_month, { input: 1000, cacheRead: 5000, cacheWrite: 200, output: 300 });
+  assert.equal(other.members[0].email, "stranger@example.com");
+  assert.ok(other.last_active);
+  // Nothing about what they cook.
+  assert.ok(!JSON.stringify(rows).includes("Secret stew"));
+  assert.ok(!JSON.stringify(rows).includes("plan my week"));
+
+  assert.equal((await as(STRANGER, "select count(*)::int as n from public.admin_households()"))[0].n, 0);
+  assert.equal((await as(NEWCOMER, "select count(*)::int as n from public.admin_households()"))[0].n, 0);
+});
+
+test("everyone reads the daily Chef limit, only admins change it", async () => {
+  const { as } = await setup();
+  assert.equal((await as(STRANGER, "select chef_daily_limit as n from public.app_settings"))[0].n, 80);
+  await as(STRANGER, "update public.app_settings set chef_daily_limit = 999");
+  assert.equal((await as(STRANGER, "select chef_daily_limit as n from public.app_settings"))[0].n, 80);
+  await as(JOE, "update public.app_settings set chef_daily_limit = 40");
+  assert.equal((await as(STRANGER, "select chef_daily_limit as n from public.app_settings"))[0].n, 40);
+  await assert.rejects(as(JOE, "update public.app_settings set chef_daily_limit = 0"), /check constraint/);
+  await assert.rejects(as(STRANGER, "insert into public.app_settings (id) values (true)"), /permission denied/);
 });
