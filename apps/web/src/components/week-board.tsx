@@ -1,11 +1,11 @@
-import type { HomeDinner, HomeWeek } from "@/lib/chef/brief";
+import { sharedIngredients, type HomeDinner, type HomeWeek } from "@/lib/chef/brief";
 import { dayName, weekStartOf } from "@/lib/chef/dates";
-import { DinnerMark } from "./dinner-mark";
+import { CookedStamp, DinnerMark } from "./dinner-mark";
+import { DishPlaceholder } from "./dish-art";
 import { MealPreview, MealPreviewLink } from "./meal-preview";
+import { WeekTrace } from "./week-trace";
 
-const TINTS = ["#f0b98a", "#9fcb8a", "#f2cf78", "#bfd48e", "#e7d3b0"];
-
-function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: string; i: number; sample: boolean }) {
+function DinnerTile({ dinner, today, sample }: { dinner: HomeDinner; today: string; sample: boolean }) {
   const done = dinner.status === "cooked";
   const skipped = dinner.status === "skipped";
   const tonight = dinner.date === today && dinner.status === "planned";
@@ -16,10 +16,12 @@ function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: s
     // mark in a footer, so every card in a row is the same height and buttons line up.
     <div className="group flex h-full flex-col overflow-hidden rounded-2xl border-2 border-ink bg-paper text-ink transition-[translate,box-shadow] has-[a:hover]:-translate-x-0.5 has-[a:hover]:-translate-y-0.5 has-[a:hover]:shadow-pop motion-reduce:transition-none">
       <MealPreviewLink dinner={dinner} className="flex flex-1 flex-col text-ink no-underline">
-        <div className={`relative aspect-square ${skipped ? "opacity-45 grayscale" : ""}`} style={{ background: TINTS[i % TINTS.length] }}>
-          {dinner.photoUrl && (
+        <div className={`relative aspect-square ${skipped ? "opacity-45 grayscale" : ""}`}>
+          {dinner.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed URLs from a private bucket
             <img src={dinner.photoUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <DishPlaceholder seed={dinner.recipeId} />
           )}
           {/* Stickers wrap instead of overlapping on narrow phone cards. */}
           <div className="absolute inset-x-2 top-2 flex flex-wrap items-start gap-1">
@@ -34,8 +36,8 @@ function DinnerTile({ dinner, today, i, sample }: { dinner: HomeDinner; today: s
             )}
           </div>
           {done && (
-            <span className="absolute bottom-2 left-2 -rotate-3 rounded-full border-[1.5px] border-ink bg-caper px-2 py-0.5 text-[11px] font-extrabold">
-              ✓ cooked
+            <span className="absolute bottom-2 right-2">
+              <CookedStamp dinnerId={dinner.id} />
             </span>
           )}
         </div>
@@ -73,11 +75,11 @@ export function WeekBoard({ weeks, today, sample = false }: { weeks: HomeWeek[];
             <span className="text-[13px] text-muted">{w.range}</span>
           </div>
           {w.dinners.length ? (
-            <div className="grid grid-cols-3 gap-3">
-              {w.dinners.map((d, i) => (
-                <DinnerTile key={d.id} dinner={d} today={today} i={i} sample={sample} />
+            <WeekTrace shared={sharedIngredients(w.dinners.filter((d) => d.status !== "moved"))} uses={w.dinners.map((d) => (d.status === "moved" ? [] : d.useUp))}>
+              {w.dinners.map((d) => (
+                <DinnerTile key={d.id} dinner={d} today={today} sample={sample} />
               ))}
-            </div>
+            </WeekTrace>
           ) : (
             <div className="flex min-h-28 items-center justify-center rounded-2xl border-2 border-dashed border-dash p-4 text-center text-sm text-muted">
               Nothing planned yet. Ask Chef to plan it.
@@ -85,7 +87,7 @@ export function WeekBoard({ weeks, today, sample = false }: { weeks: HomeWeek[];
           )}
         </section>
       ))}
-      <p className="m-0 text-[13px] text-muted">Tap a meal to preview it, or just tell Chef what to change.</p>
+      <p className="m-0 text-[13px] text-muted">Tap a meal to preview it, or a sticker to see which meals share it.</p>
       <MealPreview weeks={weeks} today={today} />
     </aside>
   );

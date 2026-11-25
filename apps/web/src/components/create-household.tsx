@@ -11,7 +11,7 @@ export function CreateHousehold({ firstName }: { firstName: string | null }) {
     <main className="mx-auto flex w-full max-w-[720px] flex-1 flex-col px-4 pb-8 sm:px-6">
       <div className="mb-5 flex items-center gap-3.5">
         <ChefAvatar />
-        <div className="font-display text-[22px] font-extrabold">Chef</div>
+        <div className="font-brand text-[22px] font-normal">Chef</div>
       </div>
       <div className="flex flex-col gap-4 text-lg leading-relaxed">
         <p className="m-0">Hi{firstName ? ` ${firstName}` : ""}, I&apos;m Chef. Every Sunday I&apos;ll draft your dinners so the groceries carry across nights.</p>

@@ -61,7 +61,7 @@ export function SiteHeader({ active = "chef" }: { active?: Section }) {
   return (
     <header className="relative mx-auto flex w-full max-w-[1240px] items-center justify-between gap-4 px-4 py-4 sm:px-6">
       <div className="flex items-center gap-3">
-        <Link href="/" className="whitespace-nowrap font-display text-2xl font-extrabold tracking-tight text-ink no-underline">
+        <Link href="/" className="whitespace-nowrap font-brand text-2xl font-normal text-ink no-underline">
           Common <span className="text-tomato">Thyme</span>
         </Link>
         {live && (
