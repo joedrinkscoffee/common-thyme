@@ -115,10 +115,6 @@ export interface ChefStore {
 export type GroceryWeek = {
   meals: GroceryMeal[];
   marks: GroceryMark[];
-  /** False until the grocery migration has run: check marks can't be saved yet. */
-  ready: boolean;
-  /** False until the "already have it" migration has run. */
-  haveReady: boolean;
 };
 
 export const DEFAULT_SETTINGS: HouseholdSettings = {

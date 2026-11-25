@@ -134,7 +134,7 @@ export class MemoryStore implements ChefStore {
           }),
         };
       });
-    return { meals, marks: [...(this.groceryMarks.get(weekStart) ?? [])], ready: true, haveReady: true };
+    return { meals, marks: [...(this.groceryMarks.get(weekStart) ?? [])] };
   }
   private marksFor(weekStart: string) {
     let m = this.groceryMarks.get(weekStart);

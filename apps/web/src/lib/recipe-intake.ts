@@ -7,9 +7,15 @@
  * as Chef, so recipes land exactly as if Chef had added them.
  */
 import type Anthropic from "@anthropic-ai/sdk";
-import { CHEF_MODEL, type CallModel } from "./chef/agent";
+import type { CallModel } from "./chef/agent";
 import type { FetchedPage } from "./chef/fetch-page";
 import type { ChefStore, NewRecipe } from "./chef/store";
+
+/**
+ * Copying a recipe out of a page or photo is transcription, not planning, so it runs on
+ * Sonnet (half Opus's price per token). Set RECIPE_MODEL in Vercel to switch it back.
+ */
+export const RECIPE_MODEL = process.env.RECIPE_MODEL || "claude-sonnet-5-5";
 
 export type IntakeResult =
   | { status: "saved"; id: string; title: string; photo: boolean }
@@ -96,7 +102,7 @@ async function extract(deps: IntakeDeps, content: Anthropic.Beta.BetaContentBloc
   let response: Anthropic.Beta.BetaMessage;
   try {
     response = await deps.call({
-      model: CHEF_MODEL,
+      model: RECIPE_MODEL,
       max_tokens: 16000,
       system: SYSTEM,
       messages: [{ role: "user", content }],

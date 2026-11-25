@@ -181,8 +181,6 @@ export function GroceryListView({
   range,
   tabs,
   list,
-  ready,
-  haveReady = true,
   firstName,
   sample,
 }: {
@@ -190,9 +188,6 @@ export function GroceryListView({
   range: string;
   tabs: Tab[];
   list: GroceryList;
-  ready: boolean;
-  /** False until the "already have it" update is run: pantry items then go straight on the list. */
-  haveReady?: boolean;
   firstName: string | null;
   sample: boolean;
 }) {
@@ -285,14 +280,14 @@ export function GroceryListView({
   function toggle(item: GroceryItem) {
     const next = !isChecked(item);
     setPending((p) => new Map(p).set(item.key, next));
-    if (sample || !ready) return;
+    if (sample) return;
     queue.current.set(item.key, next);
     void flush();
   }
 
   async function mark(item: GroceryItem, status: GroceryStatus | null) {
     setStatusPending((p) => new Map(p).set(item.key, status));
-    if (sample || !ready || !haveReady) return;
+    if (sample) return;
     const res = await setGroceryStatus(weekStart, item.key, status).catch(
       () => ({ ok: false as const, error: "offline" }),
     );
@@ -330,7 +325,7 @@ export function GroceryListView({
       n.delete(item.key);
       return n;
     });
-    if (sample || !ready) return;
+    if (sample) return;
     const res = await addGroceryItem(weekStart, label).catch(() => ({
       ok: false as const,
       error: "offline",
@@ -344,7 +339,7 @@ export function GroceryListView({
 
   async function remove(item: GroceryItem) {
     setRemoved((r) => new Set(r).add(item.key));
-    if (sample || !ready) return;
+    if (sample) return;
     const res = await removeGroceryItem(weekStart, item.key).catch(() => ({
       ok: false as const,
       error: "offline",
@@ -372,7 +367,7 @@ export function GroceryListView({
     ].filter((i) => !removed.has(i.key));
     const status = (i: GroceryItem) =>
       statusPending.has(i.key) ? statusPending.get(i.key)! : i.status;
-    const likely = (i: GroceryItem) => i.likely && haveReady;
+    const likely = (i: GroceryItem) => i.likely;
     const byName = (a: GroceryItem, b: GroceryItem) =>
       a.name.localeCompare(b.name);
     const buying = items.filter(
@@ -391,7 +386,7 @@ export function GroceryListView({
         .sort(byName),
       have: items.filter((i) => status(i) === "have").sort(byName),
     };
-  }, [list, added, removed, statusPending, haveReady]);
+  }, [list, added, removed, statusPending]);
 
   const all = sections.flatMap((s) => s.items);
   const total = all.length;
@@ -456,13 +451,6 @@ export function GroceryListView({
             )}
           </p>
         </div>
-      )}
-
-      {!ready && (
-        <p className="m-0 rounded-2xl border-2 border-tomato bg-paper px-4 py-3 text-[15px]">
-          Check marks won&apos;t save until the grocery list update is run in
-          Supabase.
-        </p>
       )}
 
       {pantryCheck.length > 0 && (
@@ -568,7 +556,7 @@ export function GroceryListView({
                       onToggle={() => toggle(item)}
                       onRemove={item.extra ? () => void remove(item) : undefined}
                       onHave={
-                        !item.extra && haveReady
+                        !item.extra
                           ? () => void mark(item, "have")
                           : undefined
                       }
