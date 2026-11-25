@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNo
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { loadRecipePreview, type RecipePreview } from "@/app/preview-actions";
+import { RecipeBodyBones } from "@/components/skeletons";
 import type { HomeDinner, HomeWeek } from "@/lib/chef/brief";
 import { dayName } from "@/lib/chef/dates";
 import { sharedFor, sharedWithWeek, type SharedIngredient } from "@/lib/chef/shared-with";
@@ -118,11 +119,9 @@ function SharedSticker({ shared }: { shared: SharedIngredient }) {
 function Body({ recipe, shared }: { recipe: RecipePreview | null | "loading"; shared: SharedIngredient[] }) {
   if (recipe === "loading") {
     return (
-      <div aria-busy="true" className="flex flex-col gap-2.5 pt-2">
+      <div role="status" aria-busy="true" className="pt-2">
         <span className="sr-only">Getting the recipe…</span>
-        {[70, 55, 80, 45, 62].map((w) => (
-          <div key={w} className="h-4 animate-pulse rounded-full bg-sand motion-reduce:animate-none" style={{ width: `${w}%` }} />
-        ))}
+        <RecipeBodyBones compact />
       </div>
     );
   }

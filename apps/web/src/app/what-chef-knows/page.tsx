@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
+import { ChefKnowsSkeleton } from "@/components/skeletons";
 import { getViewer } from "@/lib/household";
 import { calendarLink, chefContext, loadCalendarNights } from "@/lib/chef/server";
 import { CalendarLink, type CalendarNightView } from "@/components/calendar-link";
@@ -85,7 +86,7 @@ export default function WhatChefKnows({ searchParams }: PageProps<"/what-chef-kn
       <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 pb-10 sm:px-6">
         <h1 className="mb-1 mt-2 font-display text-4xl font-extrabold tracking-tight">What Chef knows</h1>
         <p className="mb-6 mt-0 text-muted">Chef uses these when it plans your week. Forget anything that&apos;s no longer true.</p>
-        <Suspense fallback={<p className="text-muted">Loading…</p>}>
+        <Suspense fallback={<ChefKnowsSkeleton />}>
           <NotesFor searchParams={searchParams as Promise<{ calendar?: string }>} />
         </Suspense>
       </main>

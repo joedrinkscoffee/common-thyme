@@ -162,3 +162,26 @@ html:has(dialog.meal-preview[open]) {
     opacity: 0;
   }
 }
+
+/* Skeleton loaders (components/skeletons.tsx): sand shapes with a slow, soft shine. */
+.skeleton {
+  background-color: var(--color-sand);
+  background-image: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.65) 50%, transparent 70%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shine 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-shine {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+  }
+}

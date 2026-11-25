@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { SiteHeader } from "@/components/site-header";
+import { GroceryListSkeleton } from "@/components/skeletons";
 import { GroceryListView } from "@/components/grocery-list";
 import { getViewer } from "@/lib/household";
 import { chefContext } from "@/lib/chef/server";
@@ -66,7 +67,7 @@ export default function GroceriesPage({ searchParams }: PageProps<"/groceries">)
     <>
       <SiteHeader active="groceries" />
       <main className="mx-auto w-full max-w-[680px] flex-1 px-4 pb-16 sm:px-6">
-        <Suspense fallback={<p className="text-muted">Chef is writing your list…</p>}>
+        <Suspense fallback={<GroceryListSkeleton />}>
           <Groceries searchParams={searchParams as Promise<{ week?: string }>} />
         </Suspense>
       </main>
